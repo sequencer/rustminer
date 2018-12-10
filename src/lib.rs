@@ -8,10 +8,6 @@ extern crate serde_json;
 
 #[cfg(test)]
 mod stratum {
-    extern crate serde;
-    extern crate serde_json;
-
-    use serde::Serialize;
     use std::io::prelude::*;
     use std::io::{self, BufReader, BufRead};
     use std::net::TcpStream;
@@ -38,15 +34,13 @@ mod stratum {
             pub error: Option<Vec<String>>,
         }
 
-        pub trait JsonToString {
-            fn to_string(&self) -> serde_json::Result<String>;
-        }
-
-        impl<T: serde::Serialize> JsonToString for T {
+        pub trait JsonToString: serde::Serialize {
             fn to_string(&self) -> serde_json::Result<String> {
                 serde_json::to_string(&self)
             }
         }
+
+        impl<T: serde::Serialize> JsonToString for T {}
     }
 
     impl Pool {
@@ -67,10 +61,10 @@ mod stratum {
             }
         }
 
-        pub fn try_send<T: Serialize>(&mut self, msg: T) -> io::Result<usize> {
+        pub fn try_send<T: serde::Serialize>(&mut self, msg: T) -> io::Result<usize> {
             let mut data = serde_json::to_vec(&msg).unwrap();
-            data.push('\n' as u8);
-            Ok(self.try_connect()?.write(&data)?)
+            data.push(b'\n');
+            self.try_connect()?.write(&data)
         }
 
         pub fn try_read(&mut self) -> io::Result<msg::Server> {
@@ -78,8 +72,7 @@ mod stratum {
             let mut bufr = BufReader::new(self.try_connect()?);
             bufr.read_line(&mut buf).unwrap();
             println!("{}", &buf);
-            let ret: msg::Server = serde_json::from_str(&buf)?;
-            Ok(ret)
+            Ok(serde_json::from_str(&buf)?)
         }
 
         pub fn subscribe(&mut self) -> io::Result<usize> {
