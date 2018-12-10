@@ -1,3 +1,4 @@
+#[cfg(test)]
 #[macro_use]
 extern crate serde_derive;
 
@@ -6,9 +7,8 @@ mod stratum {
     extern crate serde;
     extern crate serde_json;
 
-    use serde::de::DeserializeOwned;
-
-    use std::io::{self, Read, Write, BufReader, BufRead};
+    use std::io::prelude::*;
+    use std::io::{BufReader, BufRead};
     use std::net::TcpStream;
 
     struct Stratum {
@@ -46,7 +46,7 @@ mod stratum {
         S {
             id: i32,
             result: _Result,
-            error: Vec<String>,
+            error: Option<Vec<String>>,
         },
     }
 
@@ -71,8 +71,8 @@ mod stratum {
         pub fn try_send(&mut self, msg: &Message) {
             match self.stream {
                 Some(ref mut s) => {
-                    s.write(&serde_json::to_vec(&msg).unwrap());
-                    s.write(&['\n' as u8]);
+                    s.write(&serde_json::to_vec(&msg).unwrap()).unwrap();
+                    s.write(&['\n' as u8]).unwrap();
                 }
                 None => println!("no connect!")
             };
@@ -83,7 +83,8 @@ mod stratum {
                 Some(ref s) => {
                     let mut buf = String::new();
                     let mut bufr = BufReader::new(s);
-                    bufr.read_line(&mut buf);
+                    bufr.read_line(&mut buf).unwrap();
+                    println!("{}", &buf);
                     serde_json::from_str(&buf)
                 }
                 None => panic!()
@@ -106,7 +107,8 @@ mod stratum {
         let mut s = Stratum::new("127.0.0.1:7878");
         s.try_connect();
         s.subscribe();
-        println!("{:?}", s.try_read());
+        let ret = s.try_read().unwrap();
+        println!("{:?}", ret);
     }
 
     #[test]
@@ -125,9 +127,9 @@ mod stratum {
         let msg = Message::S {
             id: 2,
             result: _Result::R(true),
-            error: vec![],
+            error: None,
         };
-        assert_eq!(r#"{"id":2,"result":true,"error":[]}"#, to_json_str(&msg));
+        assert_eq!(r#"{"id":2,"result":true,"error":null}"#, to_json_str(&msg));
 
         let user = User("user1", "password");
 
