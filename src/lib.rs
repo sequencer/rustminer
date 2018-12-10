@@ -3,54 +3,53 @@
 extern crate serde_derive;
 
 #[cfg(test)]
+#[macro_use]
+extern crate serde_json;
+
+#[cfg(test)]
 mod stratum {
     extern crate serde;
     extern crate serde_json;
 
+    use serde::Serialize;
     use std::io::prelude::*;
-    use std::io::{BufReader, BufRead};
+    use std::io::{self, BufReader, BufRead};
     use std::net::TcpStream;
 
-    struct Stratum {
+    use self::msg::JsonToString;
+
+    pub struct Pool {
         addr: String,
-        pub stream: Option<TcpStream>,
+        stream: Option<TcpStream>,
     }
 
-    struct User<'a> (
-        pub &'a str,
-        pub &'a str,
-    );
+    mod msg {
+        #[derive(Serialize, Debug)]
+        pub struct Client<'a> {
+            pub id: i32,
+            pub method: String,
+            pub params: Vec<&'a str>,
+        }
 
-    impl<'a> User<'a> {
-        pub fn to_vec(&self) -> Vec<String> {
-            vec![String::from(self.0), String::from(self.1)]
+        #[derive(Serialize, Deserialize, Debug)]
+        pub struct Server {
+            pub id: i32,
+            pub result: serde_json::Value,
+            pub error: Option<Vec<String>>,
+        }
+
+        pub trait JsonToString {
+            fn to_string(&self) -> serde_json::Result<String>;
+        }
+
+        impl<T: serde::Serialize> JsonToString for T {
+            fn to_string(&self) -> serde_json::Result<String> {
+                serde_json::to_string(&self)
+            }
         }
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
-    #[serde(untagged)]
-    enum _Result {
-        R(bool),
-        T(Vec<String>),
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    #[serde(untagged)]
-    enum Message {
-        C {
-            id: i32,
-            method: String,
-            params: Vec<String>,
-        },
-
-        S {
-            id: i32,
-            result: _Result,
-            error: Option<Vec<String>>,
-        },
-    }
-
-    impl Stratum {
+    impl Pool {
         pub fn new(addr: &str) -> Self {
             Self {
                 addr: String::from(addr),
@@ -58,87 +57,75 @@ mod stratum {
             }
         }
 
-        pub fn try_connect(&mut self) {
-            self.stream = match TcpStream::connect(&self.addr) {
-                Ok(s) => Some(s),
-                Err(e) => {
-                    println!("connect to {} failed: {}", &self.addr, e);
-                    None
+        pub fn try_connect(&mut self) -> io::Result<&TcpStream> {
+            match self.stream {
+                Some(ref s) => Ok(s),
+                None => {
+                    self.stream = Some(TcpStream::connect(&self.addr)?);
+                    Ok(self.stream.as_ref().unwrap())
                 }
             }
         }
 
-        pub fn try_send(&mut self, msg: &Message) {
-            match self.stream {
-                Some(ref mut s) => {
-                    s.write(&serde_json::to_vec(&msg).unwrap()).unwrap();
-                    s.write(&['\n' as u8]).unwrap();
-                }
-                None => println!("no connect!")
-            };
+        pub fn try_send<T: Serialize>(&mut self, msg: T) -> io::Result<usize> {
+            let mut data = serde_json::to_vec(&msg).unwrap();
+            data.push('\n' as u8);
+            Ok(self.try_connect()?.write(&data)?)
         }
 
-        pub fn try_read(&mut self) -> Result<Message, serde_json::Error> {
-            match self.stream {
-                Some(ref s) => {
-                    let mut buf = String::new();
-                    let mut bufr = BufReader::new(s);
-                    bufr.read_line(&mut buf).unwrap();
-                    println!("{}", &buf);
-                    serde_json::from_str(&buf)
-                }
-                None => panic!()
-            }
+        pub fn try_read(&mut self) -> io::Result<msg::Server> {
+            let mut buf = String::new();
+            let mut bufr = BufReader::new(self.try_connect()?);
+            bufr.read_line(&mut buf).unwrap();
+            println!("{}", &buf);
+            let ret: msg::Server = serde_json::from_str(&buf)?;
+            Ok(ret)
         }
 
-        pub fn subscribe(&mut self) {
-            let msg = Message::C {
+        pub fn subscribe(&mut self) -> io::Result<usize> {
+            let msg = msg::Client {
                 id: 1,
                 method: String::from("mining.subscribe"),
                 params: vec![],
             };
 
-            self.try_send(&msg);
+            self.try_send(&msg)
         }
     }
 
     #[test]
     fn connect_to_tcp() {
-        let mut s = Stratum::new("127.0.0.1:7878");
-        s.try_connect();
-        s.subscribe();
-        let ret = s.try_read().unwrap();
-        println!("{:?}", ret);
+        let mut s = Pool::new("cn.ss.btc.com:1800");
+        let ret = s.try_connect();
+        println!("1,{:?}", ret);
+        let ret = s.subscribe();
+        println!("2,{:?}", ret);
+        let ret = s.try_read();
+        println!("3,{:?}", ret);
     }
 
     #[test]
     fn serialize_json_data() {
-        fn to_json_str(msg: &Message) -> String {
-            serde_json::to_string(&msg).unwrap()
-        }
-
-        let msg = Message::C {
+        let msg = msg::Client {
             id: 1,
             method: String::from("mining.subscribe"),
             params: vec![],
         };
-        assert_eq!(r#"{"id":1,"method":"mining.subscribe","params":[]}"#, to_json_str(&msg));
+        assert_eq!(r#"{"id":1,"method":"mining.subscribe","params":[]}"#, &msg.to_string().unwrap());
 
-        let msg = Message::S {
+        let msg = msg::Server {
             id: 2,
-            result: _Result::R(true),
+            result: json!(true),
             error: None,
         };
-        assert_eq!(r#"{"id":2,"result":true,"error":null}"#, to_json_str(&msg));
+        assert_eq!(r#"{"id":2,"result":true,"error":null}"#, &msg.to_string().unwrap());
 
-        let user = User("user1", "password");
-
-        let msg = Message::C {
+        let msg = msg::Client {
             id: 3,
             method: String::from("mining.authorize"),
-            params: user.to_vec(),
+            params: vec!["user1", "password"],
         };
         assert_eq!(r#"{"id":3,"method":"mining.authorize","params":["user1","password"]}"#,
-                   to_json_str(&msg));
+                   &msg.to_string().unwrap());
     }
 }
