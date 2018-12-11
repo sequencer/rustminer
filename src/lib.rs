@@ -69,7 +69,7 @@ mod stratum {
         }
 
         pub fn try_send<T: serde::Serialize>(&mut self, msg: T) -> io::Result<usize> {
-            let mut data = serde_json::to_vec(&msg).unwrap();
+            let mut data = serde_json::to_vec(&msg)?;
             data.push(b'\n');
             self.try_connect()?.write(&data)
         }
@@ -77,7 +77,7 @@ mod stratum {
         pub fn try_read(&mut self) -> io::Result<msg::Server> {
             let mut buf = String::new();
             let mut bufr = BufReader::new(self.try_connect()?);
-            bufr.read_line(&mut buf).unwrap();
+            bufr.read_line(&mut buf)?;
             println!("{}", &buf);
             Ok(serde_json::from_str(&buf)?)
         }
