@@ -17,21 +17,22 @@ mod stratum {
     pub struct Pool {
         addr: String,
         stream: Option<TcpStream>,
+        msgid: u32
     }
 
     mod msg {
         #[derive(Serialize, Debug)]
         pub struct Client<'a> {
-            pub id: i32,
+            pub id: u32,
             pub method: String,
             pub params: Vec<&'a str>,
         }
 
         #[derive(Serialize, Deserialize, Debug)]
         pub struct Server {
-            pub id: i32,
+            pub id: u32,
             pub result: serde_json::Value,
-            pub error: Option<Vec<String>>,
+            pub error: serde_json::Value,
         }
 
         pub trait JsonToString: serde::Serialize {
@@ -48,7 +49,13 @@ mod stratum {
             Self {
                 addr: String::from(addr),
                 stream: None,
+                msgid: 0
             }
+        }
+
+        fn msgid(&mut self) -> u32 {
+            self.msgid = self.msgid + 1;
+            self.msgid
         }
 
         pub fn try_connect(&mut self) -> io::Result<&TcpStream> {
@@ -77,11 +84,19 @@ mod stratum {
 
         pub fn subscribe(&mut self) -> io::Result<usize> {
             let msg = msg::Client {
-                id: 1,
+                id: self.msgid(),
                 method: String::from("mining.subscribe"),
                 params: vec![],
             };
+            self.try_send(&msg)
+        }
 
+        pub fn authorize(&mut self, user: &str, pass: &str) -> io::Result<usize> {
+            let msg = msg::Client {
+                id: self.msgid(),
+                method: String::from("mining.authorize"),
+                params: vec![user, pass]
+            };
             self.try_send(&msg)
         }
     }
@@ -95,6 +110,10 @@ mod stratum {
         println!("2,{:?}", ret);
         let ret = s.try_read();
         println!("3,{:?}", ret);
+        let ret = s.authorize("username","");
+        println!("4,{:?}", ret);
+        let ret = s.try_read();
+        println!("5,{:?}", ret);
     }
 
     #[test]
@@ -109,7 +128,7 @@ mod stratum {
         let msg = msg::Server {
             id: 2,
             result: json!(true),
-            error: None,
+            error: json!(null),
         };
         assert_eq!(r#"{"id":2,"result":true,"error":null}"#, &msg.to_string().unwrap());
 
