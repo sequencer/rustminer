@@ -1,6 +1,8 @@
 use std::io::prelude::*;
 use std::io::{self, BufReader, BufRead};
 use std::net::TcpStream;
+use std::thread::{self, JoinHandle};
+use std::sync::mpsc;
 
 use self::msg::JsonToString;
 
@@ -28,10 +30,66 @@ mod msg {
     impl<T: serde::Serialize> JsonToString for T {}
 }
 
+struct Writer {
+    sender: mpsc::Sender<String>,
+    handle: JoinHandle<()>,
+}
+
+impl Writer {
+    pub fn new(stream: &TcpStream) -> Self {
+        let mut stream = stream.try_clone().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let mut data: String;
+            loop {
+                data = rx.recv().unwrap();
+                stream.write(data.as_bytes());
+            };
+        });
+        Self {
+            sender: tx,
+            handle,
+        }
+    }
+
+    pub fn join(self) {
+        self.handle.join();
+    }
+}
+
+struct Reader {
+    receiver: mpsc::Receiver<String>,
+    handle: JoinHandle<()>,
+}
+
+impl Reader {
+    pub fn new(stream: &TcpStream) -> Self {
+        let mut bufr = BufReader::new(stream.try_clone().unwrap());
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            loop {
+                let mut buf = String::new();
+                bufr.read_line(&mut buf).unwrap();
+                tx.send(buf);
+            };
+        });
+        Self {
+            receiver: rx,
+            handle,
+        }
+    }
+
+    pub fn join(self) {
+        self.handle.join();
+    }
+}
+
 pub struct Pool {
     addr: String,
     stream: Option<TcpStream>,
     msgid: u32,
+    reader: Option<Reader>,
+    writer: Option<Writer>,
 }
 
 impl Pool {
@@ -40,7 +98,14 @@ impl Pool {
             addr: String::from(addr),
             stream: None,
             msgid: 0,
+            reader: None,
+            writer: None,
         }
+    }
+
+    pub fn join_all(self) {
+        self.reader.unwrap().handle.join();
+        self.writer.unwrap().handle.join();
     }
 
     fn msgid(&mut self) -> u32 {
@@ -58,52 +123,70 @@ impl Pool {
         }
     }
 
-    pub fn try_send<T: serde::Serialize>(&mut self, msg: T) -> io::Result<usize> {
-        let mut data = serde_json::to_vec(&msg)?;
-        data.push(b'\n');
-        self.try_connect()?.write(&data)
+    pub fn sender(&mut self) -> &mpsc::Sender<String> {
+        match self.writer {
+            Some(ref writer) => &writer.sender,
+            None => {
+                self.writer = Some(Writer::new(&self.try_connect().unwrap()));
+                &self.writer.as_ref().unwrap().sender
+            }
+        }
     }
 
-    pub fn try_read(&mut self) -> io::Result<msg::Server> {
-        let mut buf = String::new();
-        let mut bufr = BufReader::new(self.try_connect()?);
-        bufr.read_line(&mut buf)?;
-        println!("{}", &buf);
-        Ok(serde_json::from_str(&buf)?)
+    pub fn receiver(&mut self) -> &mpsc::Receiver<String> {
+        match self.reader {
+            Some(ref reader) => &reader.receiver,
+            None => {
+                self.reader = Some(Reader::new(&self.try_connect().unwrap()));
+                &self.reader.as_ref().unwrap().receiver
+            }
+        }
     }
 
-    pub fn subscribe(&mut self) -> io::Result<usize> {
+    pub fn try_send<T: serde::Serialize>(&mut self, msg: T) {
+        let mut data = serde_json::to_string(&msg).unwrap();
+        data.push('\n');
+        self.sender().send(data);
+    }
+
+    pub fn try_read(&mut self) -> String {
+        self.receiver().recv().unwrap()
+    }
+
+    pub fn subscribe(&mut self) {
         let msg = msg::Client {
             id: self.msgid(),
             method: String::from("mining.subscribe"),
             params: vec![],
         };
-        self.try_send(&msg)
+        self.try_send(&msg);
     }
 
-    pub fn authorize(&mut self, user: &str, pass: &str) -> io::Result<usize> {
+    pub fn authorize(&mut self, user: &str, pass: &str) {
         let msg = msg::Client {
             id: self.msgid(),
             method: String::from("mining.authorize"),
             params: vec![user, pass],
         };
-        self.try_send(&msg)
+        self.try_send(&msg);
     }
 }
 
 #[test]
 fn connect_to_tcp() {
-    let mut s = Pool::new("cn.ss.btc.com:1800");
-    let ret = s.try_connect();
+    let mut pool = Pool::new("cn.ss.btc.com:1800");
+    let ret = pool.try_connect();
     println!("1,{:?}", ret);
-    let ret = s.subscribe();
+    let ret = pool.subscribe();
     println!("2,{:?}", ret);
-    let ret = s.try_read();
+    let ret = pool.try_read();
     println!("3,{:?}", ret);
-    let ret = s.authorize("username", "");
+    let ret = pool.authorize("username", "");
     println!("4,{:?}", ret);
-    let ret = s.try_read();
-    println!("5,{:?}", ret);
+    for received in pool.receiver() {
+        println!("received: {}", received);
+    }
+    pool.join_all();
 }
 
 #[test]
