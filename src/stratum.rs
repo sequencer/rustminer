@@ -2,6 +2,7 @@ use std::io::prelude::*;
 use std::io::{self, BufReader, BufRead};
 use std::net::TcpStream;
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 use std::sync::mpsc;
 
 use self::msg::JsonToString;
@@ -115,8 +116,14 @@ impl Pool {
 
     pub fn try_connect(&mut self) -> io::Result<&TcpStream> {
         match self.stream {
-            Some(ref s) => Ok(s),
-            None => {
+            Some(ref s) if match s.take_error() {
+                Ok(None) => true,
+                Ok(Some(e)) | Err(e) => {
+                    println!("{:?}", e);
+                    false
+                }
+            } => Ok(s),
+            _ => {
                 self.stream = Some(TcpStream::connect(&self.addr)?);
                 Ok(self.stream.as_ref().unwrap())
             }
@@ -180,8 +187,8 @@ fn connect_to_tcp() {
     let ret = pool.subscribe();
     println!("2,{:?}", ret);
     let ret = pool.try_read();
-    println!("3,{:?}", ret);
-    let ret = pool.authorize("username", "");
+    println!("3,{}", ret);
+    let ret = pool.authorize("h723n8m.001", "");
     println!("4,{:?}", ret);
     for received in pool.receiver() {
         println!("received: {}", received);

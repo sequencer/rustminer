@@ -8,3 +8,6 @@ extern crate serde_json;
 
 #[cfg(test)]
 mod stratum;
+
+#[cfg(test)]
+mod work;
