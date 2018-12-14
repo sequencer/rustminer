@@ -1,4 +1,3 @@
-use std::fmt;
 use ring::digest;
 use hex::{self, FromHex};
 
@@ -15,29 +14,49 @@ struct Work {
     clean: bool,
 }
 
+trait Append: Extend<u8> {
+    fn append_hex(&mut self, s: &String) -> &mut Self;
+    fn append_bytes(&mut self, b: &[u8]) -> &mut Self;
+}
+
+impl Append for Vec<u8> {
+    fn append_hex(&mut self, s: &String) -> &mut Self {
+        self.extend(Vec::from_hex(s).unwrap());
+        self
+    }
+
+    fn append_bytes(&mut self, b: &[u8]) -> &mut Self {
+        self.extend_from_slice(b);
+        self
+    }
+}
+
 impl Work {
     fn merkle_root(&self, xnonce2: u32) -> Vec<u8> {
-        let xnonce1 = "69bf584a";
+        let xnonce1 = String::from("69bf584a");
         let xnonce2_size = 8;
-        let coinbase = String::new()
-            + &self.coinbase1.as_str() + xnonce1
-            + format!("{n:>0size$}", n = xnonce2, size = xnonce2_size).as_str()
-            + &self.coinbase2.as_str();
-        let mut data: Vec<u8> = Vec::from_hex(coinbase).unwrap();
-        let mut root = sha256d(data.as_ref());
+        let xnonce2_string = format!("{n:>0size$}", n = xnonce2, size = xnonce2_size);
+        let mut coinbase: Vec<u8> = Vec::new();
+        coinbase.append_hex(&self.coinbase1)
+            .append_hex(&self.coinbase1)
+            .append_hex(&xnonce1)
+            .append_hex(&xnonce2_string)
+            .append_hex(&self.coinbase2);
+        let mut root = sha256d(coinbase.as_ref());
         for node in &self.merkle_branch {
-            for byte in node.clone().into_bytes() {
-                data.push(byte);
-            }
-            root = sha256d(data.as_slice());
+            root = sha256d(root.append_hex(node));
         }
         root
     }
 
-    pub fn block_header(&self, xnonce2: u32) -> String {
-        let merkle_root = hex::encode(self.merkle_root(xnonce2));
-        String::new() + &self.version.as_str() + &self.prevhash.as_str()
-            + merkle_root.as_str() + &self.ntime.as_str() + &self.nbits.as_str()
+    pub fn block_header(&self, xnonce2: u32) -> Vec<u8> {
+        let merkle_root = self.merkle_root(xnonce2);
+        let mut ret: Vec<u8> = Vec::new();
+        ret.append_hex(&self.version)
+            .append_hex(&self.prevhash)
+            .append_bytes(self.merkle_root(xnonce2).as_mut())
+            .append_hex(&self.nbits);
+        ret
     }
 }
 
@@ -76,5 +95,5 @@ fn deserialize_work() {
     let work: Work = serde_json::from_str(work).unwrap();
     println!("{:?}", &work);
     let block_header = work.block_header(100);
-    println!("{}", &block_header);
+    println!("{}", hex::encode(&block_header));
 }
