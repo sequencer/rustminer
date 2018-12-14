@@ -2,7 +2,7 @@ use ring::digest;
 use hex::{self, FromHex, FromHexError};
 use bytes::{Bytes, BytesMut};
 
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de::SeqAccess};
 use serde::de;
 use std::fmt;
 
@@ -15,6 +15,7 @@ struct Work {
     coinbase1: Bytes,
     #[serde(deserialize_with = "bytes_from_hex")]
     coinbase2: Bytes,
+    #[serde(deserialize_with = "bytes_seq_from_hex")]
     merkle_branch: Vec<Bytes>,
     #[serde(deserialize_with = "bytes_from_hex")]
     version: Bytes,
@@ -29,18 +30,33 @@ fn bytes_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D
     struct BytesVisitor;
     impl<'de> serde::de::Visitor<'de> for BytesVisitor {
         type Value = Bytes;
-
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("byte array")
         }
-        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-        {
-            Ok(Bytes::from(Vec::from_hex(s).unwrap()))
+        fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
+            Ok(Bytes::from(Vec::from_hex(s).unwrap_or_default()))
         }
     }
     deserializer.deserialize_str(BytesVisitor)
+}
+
+fn bytes_seq_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Bytes>, D::Error> {
+    struct BytesSeqVisitor;
+    impl<'de> serde::de::Visitor<'de> for BytesSeqVisitor {
+        type Value = Vec<Bytes>;
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("byte array")
+        }
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let len = seq.size_hint().unwrap_or(0);
+            let mut values = Vec::with_capacity(len);
+            while let Some(value) = seq.next_element::<&str>()? {
+                values.push(Bytes::from(Vec::from_hex(value).unwrap_or_default()));
+            }
+            Ok(values)
+        }
+    }
+    deserializer.deserialize_seq(BytesSeqVisitor)
 }
 
 impl Work {
