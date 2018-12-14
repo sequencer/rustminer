@@ -1,69 +1,79 @@
 use ring::digest;
-use hex::{self, FromHex};
+use hex::{self, FromHex, FromHexError};
+use bytes::{Bytes, BytesMut};
+
+use serde::{Deserialize, Deserializer};
+use serde::de;
+use std::fmt;
 
 #[derive(Deserialize, Debug)]
 struct Work {
-    id: String,
-    prevhash: String,
-    coinbase1: String,
-    coinbase2: String,
-    merkle_branch: Vec<String>,
-    version: String,
-    nbits: String,
-    ntime: String,
+    id: Bytes,
+    #[serde(deserialize_with = "bytes_from_hex")]
+    prevhash: Bytes,
+    #[serde(deserialize_with = "bytes_from_hex")]
+    coinbase1: Bytes,
+    #[serde(deserialize_with = "bytes_from_hex")]
+    coinbase2: Bytes,
+    merkle_branch: Vec<Bytes>,
+    #[serde(deserialize_with = "bytes_from_hex")]
+    version: Bytes,
+    #[serde(deserialize_with = "bytes_from_hex")]
+    nbits: Bytes,
+    #[serde(deserialize_with = "bytes_from_hex")]
+    ntime: Bytes,
     clean: bool,
 }
 
-trait Append: Extend<u8> {
-    fn append_hex(&mut self, s: &String) -> &mut Self;
-    fn append_bytes(&mut self, b: &[u8]) -> &mut Self;
-}
+fn bytes_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
+    struct BytesVisitor;
+    impl<'de> serde::de::Visitor<'de> for BytesVisitor {
+        type Value = Bytes;
 
-impl Append for Vec<u8> {
-    fn append_hex(&mut self, s: &String) -> &mut Self {
-        self.extend(Vec::from_hex(s).unwrap());
-        self
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("byte array")
+        }
+        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+        {
+            Ok(Bytes::from(Vec::from_hex(s).unwrap()))
+        }
     }
-
-    fn append_bytes(&mut self, b: &[u8]) -> &mut Self {
-        self.extend_from_slice(b);
-        self
-    }
+    deserializer.deserialize_str(BytesVisitor)
 }
 
 impl Work {
-    fn merkle_root(&self, xnonce2: u32) -> Vec<u8> {
-        let xnonce1 = String::from("69bf584a");
-        let xnonce2_size = 8;
-        let xnonce2_string = format!("{n:>0size$}", n = xnonce2, size = xnonce2_size);
-        let mut coinbase: Vec<u8> = Vec::new();
-        coinbase.append_hex(&self.coinbase1)
-            .append_hex(&self.coinbase1)
-            .append_hex(&xnonce1)
-            .append_hex(&xnonce2_string)
-            .append_hex(&self.coinbase2);
-        let mut root = sha256d(coinbase.as_ref());
+    fn merkle_root(&self, xnonce2: &Bytes) -> Bytes {
+        let xnonce1 = Bytes::from(Vec::from_hex("69bf584a").unwrap());
+        let mut coinbase = Bytes::new();
+        coinbase.extend(&self.coinbase1);
+        coinbase.extend(&xnonce1);
+        coinbase.extend(xnonce2);
+        coinbase.extend(&self.coinbase2);
+        let mut root = sha256d(&coinbase);
         for node in &self.merkle_branch {
-            root = sha256d(root.append_hex(node));
+            root.extend(node);
+            root = sha256d(&root);
         }
         root
     }
 
-    pub fn block_header(&self, xnonce2: u32) -> Vec<u8> {
+    pub fn block_header(&self, xnonce2: &Bytes) -> Bytes {
         let merkle_root = self.merkle_root(xnonce2);
-        let mut ret: Vec<u8> = Vec::new();
-        ret.append_hex(&self.version)
-            .append_hex(&self.prevhash)
-            .append_bytes(self.merkle_root(xnonce2).as_mut())
-            .append_hex(&self.nbits);
+        let mut ret = Bytes::new();
+        ret.extend(&self.version);
+        ret.extend(&self.prevhash);
+        ret.extend(&self.merkle_root(xnonce2));
+        ret.extend(&self.nbits);
         ret
     }
 }
 
-pub fn sha256d(data: &[u8]) -> Vec<u8> {
+pub fn sha256d(data: &Bytes) -> Bytes {
     let mut data = digest::digest(&digest::SHA256, &data);
     data = digest::digest(&digest::SHA256, &data.as_ref());
-    data.as_ref().to_vec()
+    Bytes::from(data.as_ref())
 }
 
 #[test]
@@ -94,6 +104,6 @@ fn deserialize_work() {
     ]"#;
     let work: Work = serde_json::from_str(work).unwrap();
     println!("{:?}", &work);
-    let block_header = work.block_header(100);
-    println!("{}", hex::encode(&block_header));
+    let block_header = work.block_header(&Bytes::from(Vec::from_hex("69bf584a").unwrap()));
+    println!("{:?}", hex::encode(&block_header));
 }
