@@ -1,10 +1,10 @@
-use ring::digest;
-use hex::{self, FromHex, FromHexError};
-use bytes::{Bytes, BytesMut};
-
-use serde::{Deserialize, Deserializer, de::SeqAccess};
-use serde::de;
 use std::fmt;
+
+use ring::digest;
+use hex::{self, FromHex};
+use bytes::Bytes;
+use serde_derive::Deserialize;
+use serde::{de, Deserializer};
 
 #[derive(Deserialize, Debug)]
 struct Work {
@@ -28,7 +28,7 @@ struct Work {
 
 fn bytes_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
     struct BytesVisitor;
-    impl<'de> serde::de::Visitor<'de> for BytesVisitor {
+    impl<'de> de::Visitor<'de> for BytesVisitor {
         type Value = Bytes;
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("byte array")
@@ -42,12 +42,12 @@ fn bytes_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D
 
 fn bytes_seq_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Bytes>, D::Error> {
     struct BytesSeqVisitor;
-    impl<'de> serde::de::Visitor<'de> for BytesSeqVisitor {
+    impl<'de> de::Visitor<'de> for BytesSeqVisitor {
         type Value = Vec<Bytes>;
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("byte array")
         }
-        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
             let len = seq.size_hint().unwrap_or(0);
             let mut values = Vec::with_capacity(len);
             while let Some(value) = seq.next_element::<&str>()? {
@@ -87,8 +87,8 @@ impl Work {
 }
 
 pub fn sha256d(data: &Bytes) -> Bytes {
-    let mut data = digest::digest(&digest::SHA256, &data);
-    data = digest::digest(&digest::SHA256, &data.as_ref());
+    let mut data = digest::digest(&digest::SHA256, data);
+    data = digest::digest(&digest::SHA256, data.as_ref());
     Bytes::from(data.as_ref())
 }
 
@@ -120,6 +120,7 @@ fn deserialize_work() {
     ]"#;
     let work: Work = serde_json::from_str(work).unwrap();
     println!("{:?}", &work);
-    let block_header = work.block_header(&Bytes::from(Vec::from_hex("69bf584a").unwrap()));
+    let xnonce2 = Bytes::from(Vec::from_hex("69bf584a").unwrap());
+    let block_header = work.block_header(&xnonce2);
     println!("{:?}", hex::encode(&block_header));
 }

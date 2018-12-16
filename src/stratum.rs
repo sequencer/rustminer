@@ -2,12 +2,13 @@ use std::io::prelude::*;
 use std::io::{self, BufReader, BufRead};
 use std::net::TcpStream;
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
 use std::sync::mpsc;
 
 use self::msg::JsonToString;
 
 mod msg {
+    use serde_derive::{Deserialize, Serialize};
+
     #[derive(Serialize, Debug)]
     pub struct Client<'a> {
         pub id: u32,
@@ -198,6 +199,8 @@ fn connect_to_tcp() {
 
 #[test]
 fn serialize_json_data() {
+    use serde_json::json;
+
     let msg = msg::Client {
         id: 1,
         method: String::from("mining.subscribe"),
