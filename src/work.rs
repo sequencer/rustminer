@@ -1,62 +1,61 @@
 use std::fmt;
+use std::ops::Deref;
+use core::slice::Iter;
 
 use ring::digest;
 use hex::{self, FromHex};
 use bytes::Bytes;
 use serde_derive::Deserialize;
-use serde::{de, Deserializer};
+use serde::{de, Deserializer, Deserialize};
 
-#[derive(Deserialize, Debug)]
+struct BytesFromHex(Bytes);
+
+impl Deref for BytesFromHex {
+    type Target = Bytes;
+    fn deref(&self) -> &<Self as Deref>::Target {
+        &self.0
+    }
+}
+
+impl<'a> IntoIterator for &'a BytesFromHex {
+    type Item = &'a u8;
+    type IntoIter = Iter<'a, u8>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_ref().iter()
+    }
+}
+
+struct BytesVisitor;
+
+impl<'de> de::Visitor<'de> for BytesVisitor {
+    type Value = Vec<u8>;
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("bytes from hex")
+    }
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        Ok(Vec::from_hex(v).unwrap_or_default())
+    }
+}
+
+impl<'de> Deserialize<'de> for BytesFromHex {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where
+        D: Deserializer<'de> {
+        let buf = deserializer.deserialize_str(BytesVisitor)?;
+        Ok(BytesFromHex(Bytes::from(buf)))
+    }
+}
+
+#[derive(Deserialize)]
 struct Work {
-    id: Bytes,
-    #[serde(deserialize_with = "bytes_from_hex")]
-    prevhash: Bytes,
-    #[serde(deserialize_with = "bytes_from_hex")]
-    coinbase1: Bytes,
-    #[serde(deserialize_with = "bytes_from_hex")]
-    coinbase2: Bytes,
-    #[serde(deserialize_with = "bytes_seq_from_hex")]
-    merkle_branch: Vec<Bytes>,
-    #[serde(deserialize_with = "bytes_from_hex")]
-    version: Bytes,
-    #[serde(deserialize_with = "bytes_from_hex")]
-    nbits: Bytes,
-    #[serde(deserialize_with = "bytes_from_hex")]
-    ntime: Bytes,
+    id: BytesFromHex,
+    prevhash: BytesFromHex,
+    coinbase1: BytesFromHex,
+    coinbase2: BytesFromHex,
+    merkle_branch: Vec<BytesFromHex>,
+    version: BytesFromHex,
+    nbits: BytesFromHex,
+    ntime: BytesFromHex,
     clean: bool,
-}
-
-fn bytes_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
-    struct BytesVisitor;
-    impl<'de> de::Visitor<'de> for BytesVisitor {
-        type Value = Bytes;
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("byte array")
-        }
-        fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
-            Ok(Bytes::from(Vec::from_hex(s).unwrap_or_default()))
-        }
-    }
-    deserializer.deserialize_str(BytesVisitor)
-}
-
-fn bytes_seq_from_hex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Bytes>, D::Error> {
-    struct BytesSeqVisitor;
-    impl<'de> de::Visitor<'de> for BytesSeqVisitor {
-        type Value = Vec<Bytes>;
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("byte array")
-        }
-        fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-            let len = seq.size_hint().unwrap_or(0);
-            let mut values = Vec::with_capacity(len);
-            while let Some(value) = seq.next_element::<&str>()? {
-                values.push(Bytes::from(Vec::from_hex(value).unwrap_or_default()));
-            }
-            Ok(values)
-        }
-    }
-    deserializer.deserialize_seq(BytesSeqVisitor)
 }
 
 impl Work {
@@ -67,12 +66,12 @@ impl Work {
         coinbase.extend(&xnonce1);
         coinbase.extend(xnonce2);
         coinbase.extend(&self.coinbase2);
-        let mut root = sha256d(&coinbase);
+        let mut root = Self::sha256d(&coinbase);
         for node in &self.merkle_branch {
             root.extend(node);
-            root = sha256d(&root);
+            root = Self::sha256d(&root);
         }
-        flip32(root)
+        Self::flip32(root)
     }
 
     pub fn block_header(&self, xnonce2: &Bytes) -> Bytes {
@@ -84,22 +83,22 @@ impl Work {
         ret.extend(&self.nbits);
         ret
     }
-}
 
-pub fn sha256d(data: &Bytes) -> Bytes {
-    let mut data = digest::digest(&digest::SHA256, data);
-    data = digest::digest(&digest::SHA256, data.as_ref());
-    Bytes::from(data.as_ref())
-}
-
-pub fn flip32(data: Bytes) -> Bytes {
-    let len = data.len();
-    assert_eq!(len % 4, 0);
-    let mut data = data.try_mut().unwrap();
-    for i in 0..(len / 4) {
-        data[i * 4..(i * 4 + 4)].reverse();
+    fn sha256d(data: &Bytes) -> Bytes {
+        let mut data = digest::digest(&digest::SHA256, data);
+        data = digest::digest(&digest::SHA256, data.as_ref());
+        Bytes::from(data.as_ref())
     }
-    data.freeze()
+
+    fn flip32(data: Bytes) -> Bytes {
+        let len = data.len();
+        assert_eq!(len % 4, 0);
+        let mut data = data.try_mut().unwrap();
+        for i in 0..(len / 4) {
+            data[i * 4..(i * 4 + 4)].reverse();
+        }
+        data.freeze()
+    }
 }
 
 #[test]
