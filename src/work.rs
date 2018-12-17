@@ -72,15 +72,15 @@ impl Work {
             root.extend(node);
             root = sha256d(&root);
         }
-        root
+        flip32(root)
     }
 
     pub fn block_header(&self, xnonce2: &Bytes) -> Bytes {
-        let merkle_root = self.merkle_root(xnonce2);
         let mut ret = Bytes::new();
         ret.extend(&self.version);
         ret.extend(&self.prevhash);
         ret.extend(&self.merkle_root(xnonce2));
+        ret.extend(&self.ntime);
         ret.extend(&self.nbits);
         ret
     }
@@ -92,8 +92,18 @@ pub fn sha256d(data: &Bytes) -> Bytes {
     Bytes::from(data.as_ref())
 }
 
+pub fn flip32(data: Bytes) -> Bytes {
+    let len = data.len();
+    assert_eq!(len % 4, 0);
+    let mut data = data.try_mut().unwrap();
+    for i in 0..(len / 4) {
+        data[i * 4..(i * 4 + 4)].reverse();
+    }
+    data.freeze()
+}
+
 #[test]
-fn deserialize_work() {
+fn get_block_header() {
     let work = r#"[
         "1",
         "320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000",
@@ -119,8 +129,7 @@ fn deserialize_work() {
         false
     ]"#;
     let work: Work = serde_json::from_str(work).unwrap();
-    println!("{:?}", &work);
-    let xnonce2 = Bytes::from(Vec::from_hex("69bf584a").unwrap());
-    let block_header = work.block_header(&xnonce2);
-    println!("{:?}", hex::encode(&block_header));
+    let xnonce2 = Bytes::from(Vec::from_hex("12345678").unwrap());
+    let block_header = Bytes::from(Vec::from_hex("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c").unwrap());
+    assert_eq!(block_header, work.block_header(&xnonce2));
 }
