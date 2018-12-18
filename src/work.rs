@@ -99,6 +99,34 @@ impl Work {
         }
         data.freeze()
     }
+
+    fn sha256_midstate(data: &Bytes) -> Bytes {
+        use std::mem::transmute;
+
+        #[allow(dead_code)]
+        struct Context {
+            state: [u64; digest::MAX_CHAINING_LEN / 8],
+            completed_data_blocks: u64,
+            pending: [u8; digest::MAX_BLOCK_LEN],
+            num_pending: usize,
+            pub algorithm: &'static digest::Algorithm,
+        }
+
+        let mut ctx = digest::Context::new(&digest::SHA256);
+        let data = Bytes::from(data.as_ref());
+        ctx.update(Self::flip32(data).as_ref());
+
+        let mut state = [0u32; 8];
+        state.copy_from_slice(
+            unsafe { &transmute::<_, [u32; 16]>(transmute::<_, Context>(ctx).state)[..8] }
+        );
+
+        let mut ret = Bytes::with_capacity(32);
+        for i in state.iter() {
+            ret.extend(&i.to_le_bytes());
+        }
+        ret
+    }
 }
 
 #[test]
@@ -131,4 +159,11 @@ fn get_block_header() {
     let xnonce2 = Bytes::from(Vec::from_hex("12345678").unwrap());
     let block_header = Bytes::from(Vec::from_hex("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c").unwrap());
     assert_eq!(block_header, work.block_header(&xnonce2));
+}
+
+#[test]
+fn get_sha256_midstate() {
+    let data = Bytes::from_static(b"6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b");
+    let sha256_midstate = Bytes::from(Vec::from_hex("64507dfbb6c6570ded8fdd0baa66654995206d5abc103112d88eb450ab8d6ab3").unwrap());
+    assert_eq!(sha256_midstate, Work::sha256_midstate(&data));
 }
