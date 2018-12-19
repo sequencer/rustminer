@@ -21,7 +21,7 @@ struct Work {
 impl Work {
     fn merkle_root(&self, xnonce2: &Bytes) -> Bytes {
         let xnonce1 = Bytes::from(Vec::from_hex("69bf584a").unwrap());
-        let mut coinbase = Bytes::new();
+        let mut coinbase = Bytes::with_capacity(250);
         coinbase.extend(&self.coinbase1);
         coinbase.extend(&xnonce1);
         coinbase.extend(xnonce2);
@@ -35,7 +35,7 @@ impl Work {
     }
 
     pub fn block_header(&self, xnonce2: &Bytes) -> Bytes {
-        let mut ret = Bytes::new();
+        let mut ret = Bytes::with_capacity(76);
         ret.extend(&self.version);
         ret.extend(&self.prevhash);
         ret.extend(&self.merkle_root(xnonce2));
