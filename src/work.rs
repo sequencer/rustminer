@@ -3,18 +3,42 @@ use hex::{self, FromHex};
 use bytes::Bytes;
 use serde_derive::Deserialize;
 
-use super::misc::BytesFromHex;
+mod from_hex {
+    use super::*;
+    use serde::{de, Deserializer, Deserialize};
+
+    pub fn bytes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Ok(Bytes::from(Vec::from_hex(s).map_err(de::Error::custom)?))
+    }
+
+    pub fn bytes_vec<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Bytes>, D::Error> {
+        let sv: Vec<&str> = Deserialize::deserialize(deserializer)?;
+        let mut bv: Vec<Bytes> = Vec::with_capacity(sv.len());
+        for s in sv {
+            bv.push(Bytes::from(Vec::from_hex(s).map_err(de::Error::custom)?));
+        }
+        Ok(bv)
+    }
+}
 
 #[derive(Deserialize)]
 struct Work {
-    id: BytesFromHex,
-    prevhash: BytesFromHex,
-    coinbase1: BytesFromHex,
-    coinbase2: BytesFromHex,
-    merkle_branch: Vec<BytesFromHex>,
-    version: BytesFromHex,
-    nbits: BytesFromHex,
-    ntime: BytesFromHex,
+    id: Bytes,
+    #[serde(deserialize_with = "from_hex::bytes")]
+    prevhash: Bytes,
+    #[serde(deserialize_with = "from_hex::bytes")]
+    coinbase1: Bytes,
+    #[serde(deserialize_with = "from_hex::bytes")]
+    coinbase2: Bytes,
+    #[serde(deserialize_with = "from_hex::bytes_vec")]
+    merkle_branch: Vec<Bytes>,
+    #[serde(deserialize_with = "from_hex::bytes")]
+    version: Bytes,
+    #[serde(deserialize_with = "from_hex::bytes")]
+    nbits: Bytes,
+    #[serde(deserialize_with = "from_hex::bytes")]
+    ntime: Bytes,
     clean: bool,
 }
 
