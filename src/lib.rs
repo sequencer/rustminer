@@ -1,2 +1,3 @@
-mod stratum;
+mod misc;
 mod work;
+mod stratum;

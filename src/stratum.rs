@@ -4,8 +4,6 @@ use std::net::TcpStream;
 use std::thread::{self, JoinHandle};
 use std::sync::mpsc;
 
-use self::msg::JsonToString;
-
 mod msg {
     use serde_derive::{Deserialize, Serialize};
 
@@ -23,13 +21,13 @@ mod msg {
         pub error: serde_json::Value,
     }
 
-    pub trait JsonToString: serde::Serialize {
+    pub trait ToString: serde::Serialize {
         fn to_string(&self) -> serde_json::Result<String> {
             serde_json::to_string(&self)
         }
     }
 
-    impl<T: serde::Serialize> JsonToString for T {}
+    impl<T: serde::Serialize> ToString for T {}
 }
 
 struct Writer {
@@ -200,6 +198,7 @@ fn connect_to_tcp() {
 #[test]
 fn serialize_json_data() {
     use serde_json::json;
+    use self::msg::ToString;
 
     let msg = msg::Client {
         id: 1,
