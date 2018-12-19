@@ -44,6 +44,15 @@ impl Work {
         ret
     }
 
+    pub fn subwork(&self, xnonce2: &Bytes) -> SubWork {
+        let block_header = self.block_header(xnonce2);
+        SubWork {
+            midstate: Self::sha256_midstate(&block_header[..64]),
+            data2: Bytes::from(&block_header[64..]),
+            block_header,
+        }
+    }
+
     fn sha256d(data: &Bytes) -> Bytes {
         let mut data = digest::digest(&digest::SHA256, data);
         data = digest::digest(&digest::SHA256, data.as_ref());
@@ -60,7 +69,7 @@ impl Work {
         data.freeze()
     }
 
-    fn sha256_midstate(data: &Bytes) -> Bytes {
+    fn sha256_midstate(data: &[u8]) -> Bytes {
         use std::mem::transmute;
 
         #[allow(dead_code)]
@@ -73,7 +82,7 @@ impl Work {
         }
 
         let mut ctx = digest::Context::new(&digest::SHA256);
-        let data = Bytes::from(data.as_ref());
+        let data = Bytes::from(data);
         ctx.update(Self::flip32(data).as_ref());
 
         let mut state = [0u32; 8];
@@ -89,8 +98,14 @@ impl Work {
     }
 }
 
+struct SubWork {
+    midstate: Bytes,
+    data2: Bytes,
+    block_header: Bytes,
+}
+
 #[test]
-fn get_block_header() {
+fn get_subwork() {
     let work = r#"[
         "1",
         "320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000",
@@ -118,12 +133,9 @@ fn get_block_header() {
     let work: Work = serde_json::from_str(work).unwrap();
     let xnonce2 = Bytes::from(Vec::from_hex("12345678").unwrap());
     let block_header = Bytes::from(Vec::from_hex("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c").unwrap());
-    assert_eq!(block_header, work.block_header(&xnonce2));
-}
+    let midstate = Bytes::from(Vec::from_hex("bf9213db167c49769ebbf9fa75c8fda449dfb01b75ce7a9c850b0d932b028d81").unwrap());
 
-#[test]
-fn get_sha256_midstate() {
-    let data = Bytes::from_static(b"6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b");
-    let sha256_midstate = Bytes::from(Vec::from_hex("64507dfbb6c6570ded8fdd0baa66654995206d5abc103112d88eb450ab8d6ab3").unwrap());
-    assert_eq!(sha256_midstate, Work::sha256_midstate(&data));
+    let subwork = work.subwork(&xnonce2);
+    assert_eq!(block_header, &subwork.block_header);
+    assert_eq!(midstate, &subwork.midstate);
 }
