@@ -1,5 +1,5 @@
 use ring::digest;
-use hex::{self, FromHex};
+use super::hex::FromHex;
 use bytes::Bytes;
 use serde_derive::Deserialize;
 
@@ -9,14 +9,14 @@ mod from_hex {
 
     pub fn bytes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
         let s: &str = Deserialize::deserialize(deserializer)?;
-        Ok(Bytes::from(Vec::from_hex(s).map_err(de::Error::custom)?))
+        Ok(Bytes::from(s.from_hex().map_err(de::Error::custom)?))
     }
 
     pub fn bytes_vec<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Bytes>, D::Error> {
         let sv: Vec<&str> = Deserialize::deserialize(deserializer)?;
         let mut bv: Vec<Bytes> = Vec::with_capacity(sv.len());
         for s in sv {
-            bv.push(Bytes::from(Vec::from_hex(s).map_err(de::Error::custom)?));
+            bv.push(Bytes::from(s.from_hex().map_err(de::Error::custom)?));
         }
         Ok(bv)
     }
@@ -45,7 +45,7 @@ pub struct Work {
 
 impl Work {
     fn merkle_root(&self, xnonce2: &Bytes) -> Bytes {
-        let xnonce1 = Bytes::from(Vec::from_hex("69bf584a").unwrap());
+        let xnonce1 = Bytes::from("69bf584a".from_hex().unwrap());
         let mut coinbase = Bytes::with_capacity(250);
         coinbase.extend(&self.coinbase1);
         coinbase.extend(&xnonce1);
@@ -161,9 +161,9 @@ mod tests {
         false
     ]"#;
         let work: Work = serde_json::from_str(work).unwrap();
-        let xnonce2 = Bytes::from(Vec::from_hex("12345678").unwrap());
-        let block_header = Bytes::from(Vec::from_hex("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c").unwrap());
-        let midstate = Bytes::from(Vec::from_hex("bf9213db167c49769ebbf9fa75c8fda449dfb01b75ce7a9c850b0d932b028d81").unwrap());
+        let xnonce2 = Bytes::from("12345678".from_hex().unwrap());
+        let block_header = Bytes::from("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c".from_hex().unwrap());
+        let midstate = Bytes::from("bf9213db167c49769ebbf9fa75c8fda449dfb01b75ce7a9c850b0d932b028d81".from_hex().unwrap());
 
         let subwork = work.subwork(&xnonce2);
         assert_eq!(block_header, &subwork.block_header);
