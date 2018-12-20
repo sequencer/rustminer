@@ -1,2 +1,2 @@
-mod work;
-mod stratum;
+pub mod work;
+pub mod stratum;

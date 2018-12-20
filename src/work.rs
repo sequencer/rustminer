@@ -22,8 +22,9 @@ mod from_hex {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
-struct Work {
+pub struct Work {
     id: Bytes,
     #[serde(deserialize_with = "from_hex::bytes")]
     prevhash: Bytes,
@@ -122,15 +123,20 @@ impl Work {
     }
 }
 
-struct SubWork {
+#[allow(dead_code)]
+pub struct SubWork {
     midstate: Bytes,
     data2: Bytes,
     block_header: Bytes,
 }
 
-#[test]
-fn get_subwork() {
-    let work = r#"[
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_subwork() {
+        let work = r#"[
         "1",
         "320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000",
         "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b038c72080405ff115c622f4254432e434f4d2ffabe6d6d92c1c0f08fef10653fa93199f85160e9788b231135b667f61e85b4388e2b46950100000000000000",
@@ -154,12 +160,13 @@ fn get_subwork() {
         "5c11ff05",
         false
     ]"#;
-    let work: Work = serde_json::from_str(work).unwrap();
-    let xnonce2 = Bytes::from(Vec::from_hex("12345678").unwrap());
-    let block_header = Bytes::from(Vec::from_hex("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c").unwrap());
-    let midstate = Bytes::from(Vec::from_hex("bf9213db167c49769ebbf9fa75c8fda449dfb01b75ce7a9c850b0d932b028d81").unwrap());
+        let work: Work = serde_json::from_str(work).unwrap();
+        let xnonce2 = Bytes::from(Vec::from_hex("12345678").unwrap());
+        let block_header = Bytes::from(Vec::from_hex("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c").unwrap());
+        let midstate = Bytes::from(Vec::from_hex("bf9213db167c49769ebbf9fa75c8fda449dfb01b75ce7a9c850b0d932b028d81").unwrap());
 
-    let subwork = work.subwork(&xnonce2);
-    assert_eq!(block_header, &subwork.block_header);
-    assert_eq!(midstate, &subwork.midstate);
+        let subwork = work.subwork(&xnonce2);
+        assert_eq!(block_header, &subwork.block_header);
+        assert_eq!(midstate, &subwork.midstate);
+    }
 }
