@@ -2,7 +2,12 @@ use std::io::prelude::*;
 use std::io::{self, BufReader, BufRead};
 use std::net::TcpStream;
 use std::thread::{self, JoinHandle};
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Sender, Receiver};
+use std::boxed::FnBox;
+
+use failure::{Error, ResultExt};
+
+type Result<T> = std::result::Result<T, Error>;
 
 mod msg {
     use serde_derive::{Deserialize, Serialize};
@@ -31,56 +36,66 @@ mod msg {
 }
 
 struct Writer {
-    sender: mpsc::Sender<String>,
+    sender: Sender<String>,
     handle: JoinHandle<()>,
+    result: Receiver<Result<usize>>,
 }
 
 impl Writer {
     pub fn new(stream: &TcpStream) -> Self {
         let mut stream = stream.try_clone().unwrap();
-        let (tx, rx) = mpsc::channel();
+        let (data_tx, data_rx) = mpsc::channel();
+        let (result_tx, result_rx) = mpsc::channel();
         let handle = thread::spawn(move || {
-            let mut data: String;
+            let mut data = String::new();
             loop {
-                data = rx.recv().unwrap();
-                stream.write(data.as_bytes());
+                let _ = result_tx.send(
+                    Box::new(
+                        |rx: &Receiver<String>| -> Result<usize> {
+                            data = rx.recv().context("Writer recv err!")?;
+                            Ok(stream.write(data.as_bytes()).context("TcpSteam write err!")?)
+                        }).call_box((&data_rx, ))
+                );
             };
         });
         Self {
-            sender: tx,
+            sender: data_tx,
             handle,
+            result: result_rx,
         }
     }
 
-    pub fn join(self) {
-        self.handle.join();
+    pub fn join(self) -> thread::Result<()> {
+        self.handle.join()
     }
 }
 
 struct Reader {
-    receiver: mpsc::Receiver<String>,
+    receiver: Receiver<String>,
     handle: JoinHandle<()>,
 }
 
 impl Reader {
     pub fn new(stream: &TcpStream) -> Self {
         let mut bufr = BufReader::new(stream.try_clone().unwrap());
-        let (tx, rx) = mpsc::channel();
+        let (data_tx, data_rx) = mpsc::channel();
         let handle = thread::spawn(move || {
             loop {
                 let mut buf = String::new();
                 bufr.read_line(&mut buf).unwrap();
-                tx.send(buf);
+                if let Err(e) = data_tx.send(buf) {
+                    println!("Reader send err: {:?}!", e);
+                };
             };
         });
         Self {
-            receiver: rx,
+            receiver: data_rx,
             handle,
         }
     }
 
-    pub fn join(self) {
-        self.handle.join();
+    pub fn join(self) -> thread::Result<()> {
+        self.handle.join()
     }
 }
 
@@ -129,7 +144,7 @@ impl Pool {
         }
     }
 
-    pub fn sender(&mut self) -> &mpsc::Sender<String> {
+    pub fn sender(&mut self) -> &Sender<String> {
         match self.writer {
             Some(ref writer) => &writer.sender,
             None => {
@@ -139,7 +154,7 @@ impl Pool {
         }
     }
 
-    pub fn receiver(&mut self) -> &mpsc::Receiver<String> {
+    pub fn receiver(&mut self) -> &Receiver<String> {
         match self.reader {
             Some(ref reader) => &reader.receiver,
             None => {
@@ -149,32 +164,32 @@ impl Pool {
         }
     }
 
-    pub fn try_send<T: serde::Serialize>(&mut self, msg: T) {
+    pub fn try_send<T: serde::Serialize>(&mut self, msg: T) -> Result<()> {
         let mut data = serde_json::to_string(&msg).unwrap();
         data.push('\n');
-        self.sender().send(data);
+        self.sender().send(data).map_err(Error::from)
     }
 
     pub fn try_read(&mut self) -> String {
         self.receiver().recv().unwrap()
     }
 
-    pub fn subscribe(&mut self) {
+    pub fn subscribe(&mut self) -> Result<()> {
         let msg = msg::Client {
             id: self.msgid(),
             method: String::from("mining.subscribe"),
             params: vec![],
         };
-        self.try_send(&msg);
+        self.try_send(&msg)
     }
 
-    pub fn authorize(&mut self, user: &str, pass: &str) {
+    pub fn authorize(&mut self, user: &str, pass: &str) -> Result<()> {
         let msg = msg::Client {
             id: self.msgid(),
             method: String::from("mining.authorize"),
             params: vec![user, pass],
         };
-        self.try_send(&msg);
+        self.try_send(&msg)
     }
 }
 
