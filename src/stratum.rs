@@ -35,6 +35,7 @@ mod msg {
     impl<T: serde::Serialize> ToString for T {}
 }
 
+#[allow(dead_code)]
 struct Writer {
     sender: Sender<String>,
     handle: JoinHandle<()>,
@@ -118,6 +119,8 @@ impl Pool {
         }
     }
 
+    // TODO
+    #[allow(unused)]
     pub fn join_all(self) {
         self.reader.unwrap().join();
         self.writer.unwrap().join();

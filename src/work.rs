@@ -1,6 +1,7 @@
 use ring::digest;
 use super::hex::FromHex;
 use bytes::Bytes;
+use num_bigint::BigUint;
 use serde_derive::Deserialize;
 
 mod from_hex {
@@ -75,6 +76,7 @@ impl Work {
             midstate: Self::sha256_midstate(&block_header[..64]),
             data2: Bytes::from(&block_header[64..]),
             block_header,
+            nonce: None,
         }
     }
 
@@ -84,7 +86,7 @@ impl Work {
         Bytes::from(data.as_ref())
     }
 
-    fn flip32(data: Bytes) -> Bytes {
+    pub fn flip32(data: Bytes) -> Bytes {
         let len = data.len();
         assert_eq!(len % 4, 0);
         let mut data = data.try_mut().unwrap();
@@ -128,6 +130,26 @@ pub struct SubWork {
     midstate: Bytes,
     data2: Bytes,
     block_header: Bytes,
+    nonce: Option<Bytes>,
+}
+
+#[allow(dead_code)]
+impl SubWork {
+    pub fn send_to_asic(&self) {
+        unimplemented!();
+    }
+
+    pub fn diff(&self) -> BigUint {
+        static NUM: [u32; 7] = [0xffffffffu32; 7];
+        let mut temp = Bytes::new();
+        temp.extend(&self.block_header);
+        temp.extend(self.nonce.as_ref().unwrap());
+        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(Work::flip32(temp).as_ref())
+    }
+
+    pub fn get_nonce(&mut self, nonce: Bytes) {
+        self.nonce = Some(nonce);
+    }
 }
 
 #[cfg(test)]
