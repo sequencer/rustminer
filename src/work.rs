@@ -2,7 +2,7 @@ use super::hex::FromHex;
 use super::utils::*;
 use bytes::Bytes;
 use num_bigint::BigUint;
-use serde_derive::Deserialize;
+use serde_derive::{Serialize, Deserialize};
 
 mod from_hex {
     use super::*;
@@ -24,7 +24,7 @@ mod from_hex {
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Work {
     id: Bytes,
     #[serde(deserialize_with = "from_hex::bytes")]
@@ -103,7 +103,7 @@ impl SubWork {
         BigUint::from_slice(&NUM) / BigUint::from_bytes_be(flip32(temp).as_ref())
     }
 
-    pub fn get_nonce(&mut self, nonce: Bytes) {
+    pub fn recv_nonce(&mut self, nonce: Bytes) {
         self.nonce = Some(nonce);
     }
 }

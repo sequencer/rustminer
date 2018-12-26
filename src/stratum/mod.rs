@@ -7,33 +7,12 @@ use std::boxed::FnBox;
 
 use failure::{Error, ResultExt};
 
+use super::work::*;
+use self::message::*;
+
 type Result<T> = std::result::Result<T, Error>;
 
-mod msg {
-    use serde_derive::{Deserialize, Serialize};
-
-    #[derive(Serialize, Debug)]
-    pub struct Client<'a> {
-        pub id: u32,
-        pub method: String,
-        pub params: Vec<&'a str>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Server {
-        pub id: u32,
-        pub result: serde_json::Value,
-        pub error: serde_json::Value,
-    }
-
-    pub trait ToString: serde::Serialize {
-        fn to_string(&self) -> serde_json::Result<String> {
-            serde_json::to_string(&self)
-        }
-    }
-
-    impl<T: serde::Serialize> ToString for T {}
-}
+mod message;
 
 #[allow(dead_code)]
 struct Writer {
@@ -83,11 +62,15 @@ impl Reader {
         let handle = thread::spawn(move || {
             loop {
                 let mut buf = String::new();
-                bufr.read_line(&mut buf).unwrap();
+                if let Ok(_) = bufr.read_line(&mut buf) {
+                    if let Ok(s) = serde_json::from_str::<Action>(&buf) {
+                        println!("==> {:?}", s.params);
+                    }
+                }
                 if let Err(e) = data_tx.send(buf) {
                     println!("Reader send err: {:?}!", e);
-                };
-            };
+                }
+            }
         });
         Self {
             receiver: data_rx,
@@ -103,7 +86,7 @@ impl Reader {
 pub struct Pool {
     addr: String,
     stream: Option<TcpStream>,
-    msgid: u32,
+    counter: u32,
     reader: Option<Reader>,
     writer: Option<Writer>,
 }
@@ -113,7 +96,7 @@ impl Pool {
         Self {
             addr: String::from(addr),
             stream: None,
-            msgid: 0,
+            counter: 0,
             reader: None,
             writer: None,
         }
@@ -126,9 +109,9 @@ impl Pool {
         self.writer.unwrap().join();
     }
 
-    fn msgid(&mut self) -> u32 {
-        self.msgid = self.msgid + 1;
-        self.msgid
+    fn counter(&mut self) -> Option<u32> {
+        self.counter = self.counter + 1;
+        Some(self.counter)
     }
 
     pub fn try_connect(&mut self) -> io::Result<&TcpStream> {
@@ -178,19 +161,19 @@ impl Pool {
     }
 
     pub fn subscribe(&mut self) -> Result<()> {
-        let msg = msg::Client {
-            id: self.msgid(),
+        let msg = Action {
+            id: self.counter(),
             method: String::from("mining.subscribe"),
-            params: vec![],
+            params: Params::None(vec![]),
         };
         self.try_send(&msg)
     }
 
     pub fn authorize(&mut self, user: &str, pass: &str) -> Result<()> {
-        let msg = msg::Client {
-            id: self.msgid(),
+        let msg = Action {
+            id: self.counter(),
             method: String::from("mining.authorize"),
-            params: vec![user, pass],
+            params: Params::User([String::from(user), String::from(pass)]),
         };
         self.try_send(&msg)
     }
@@ -220,26 +203,26 @@ mod tests {
     #[test]
     fn serialize_json_data() {
         use serde_json::json;
-        use self::msg::ToString;
+        use self::ToString;
 
-        let msg = msg::Client {
-            id: 1,
+        let msg = Action {
+            id: Some(1),
             method: String::from("mining.subscribe"),
-            params: vec![],
+            params: Params::None(vec![]),
         };
         assert_eq!(r#"{"id":1,"method":"mining.subscribe","params":[]}"#, &msg.to_string().unwrap());
 
-        let msg = msg::Server {
-            id: 2,
+        let msg = Respond {
+            id: Some(2),
             result: json!(true),
             error: json!(null),
         };
         assert_eq!(r#"{"id":2,"result":true,"error":null}"#, &msg.to_string().unwrap());
 
-        let msg = msg::Client {
-            id: 3,
+        let msg = Action {
+            id: Some(3),
             method: String::from("mining.authorize"),
-            params: vec!["user1", "password"],
+            params: Params::User([String::from("user1"), String::from("password")]),
         };
         assert_eq!(r#"{"id":3,"method":"mining.authorize","params":["user1","password"]}"#,
                    &msg.to_string().unwrap());
