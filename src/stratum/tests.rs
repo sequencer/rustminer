@@ -11,15 +11,14 @@ fn connect_to_tcp() {
     println!("3,{}", ret);
     let ret = pool.authorize("h723n8m.001", "");
     println!("4,{:?}", ret);
-//        for received in pool.receiver() {
-//            println!("received: {}", received);
-//        }
-//        pool.join_all();
+        for received in pool.receiver() {
+            println!("received: {}", received);
+        }
+        pool.join_all();
 }
 
 #[test]
 fn serialize_json_data() {
-    use serde_json::json;
     use self::ToString;
 
     let msg = Action {
@@ -28,13 +27,6 @@ fn serialize_json_data() {
         params: Params::None(vec![]),
     };
     assert_eq!(r#"{"id":1,"method":"mining.subscribe","params":[]}"#, &msg.to_string().unwrap());
-
-    let msg = Respond {
-        id: Some(2),
-        result: json!(true),
-        error: json!(null),
-    };
-    assert_eq!(r#"{"id":2,"result":true,"error":null}"#, &msg.to_string().unwrap());
 
     let msg = Action {
         id: Some(3),
