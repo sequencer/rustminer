@@ -1,6 +1,9 @@
 use ring::digest;
 use bytes::Bytes;
 
+pub mod hex;
+pub use self::hex::FromHex;
+
 pub fn sha256d(data: &Bytes) -> Bytes {
     let mut data = digest::digest(&digest::SHA256, data);
     data = digest::digest(&digest::SHA256, data.as_ref());
@@ -43,4 +46,23 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
         ret.extend(&i.to_le_bytes());
     }
     ret
+}
+
+pub mod hex_to {
+    use super::*;
+    use serde::{de, Deserializer, Deserialize};
+
+    pub fn bytes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Ok(Bytes::from(s.from_hex().map_err(de::Error::custom)?))
+    }
+
+    pub fn bytes_vec<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Bytes>, D::Error> {
+        let sv: Vec<&str> = Deserialize::deserialize(deserializer)?;
+        let mut bv: Vec<Bytes> = Vec::with_capacity(sv.len());
+        for s in sv {
+            bv.push(Bytes::from(s.from_hex().map_err(de::Error::custom)?));
+        }
+        Ok(bv)
+    }
 }

@@ -13,6 +13,8 @@ use self::message::*;
 type Result<T> = std::result::Result<T, Error>;
 
 mod message;
+#[cfg(test)]
+mod tests;
 
 #[allow(dead_code)]
 struct Writer {
@@ -176,55 +178,5 @@ impl Pool {
             params: Params::User([String::from(user), String::from(pass)]),
         };
         self.try_send(&msg)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn connect_to_tcp() {
-        let mut pool = Pool::new("cn.ss.btc.com:1800");
-        let ret = pool.try_connect();
-        println!("1,{:?}", ret);
-        let ret = pool.subscribe();
-        println!("2,{:?}", ret);
-        let ret = pool.try_read();
-        println!("3,{}", ret);
-        let ret = pool.authorize("h723n8m.001", "");
-        println!("4,{:?}", ret);
-//        for received in pool.receiver() {
-//            println!("received: {}", received);
-//        }
-//        pool.join_all();
-    }
-
-    #[test]
-    fn serialize_json_data() {
-        use serde_json::json;
-        use self::ToString;
-
-        let msg = Action {
-            id: Some(1),
-            method: String::from("mining.subscribe"),
-            params: Params::None(vec![]),
-        };
-        assert_eq!(r#"{"id":1,"method":"mining.subscribe","params":[]}"#, &msg.to_string().unwrap());
-
-        let msg = Respond {
-            id: Some(2),
-            result: json!(true),
-            error: json!(null),
-        };
-        assert_eq!(r#"{"id":2,"result":true,"error":null}"#, &msg.to_string().unwrap());
-
-        let msg = Action {
-            id: Some(3),
-            method: String::from("mining.authorize"),
-            params: Params::User([String::from("user1"), String::from("password")]),
-        };
-        assert_eq!(r#"{"id":3,"method":"mining.authorize","params":["user1","password"]}"#,
-                   &msg.to_string().unwrap());
     }
 }
