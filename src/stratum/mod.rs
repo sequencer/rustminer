@@ -1,102 +1,22 @@
-use std::io::prelude::*;
-use std::io::{self, BufReader, BufRead};
+use std::io;
 use std::net::TcpStream;
 use std::thread::{self, JoinHandle};
 use std::sync::mpsc::{self, Sender, Receiver};
-use std::boxed::FnBox;
 
-use failure::{Error, ResultExt};
+pub use failure::{Error, ResultExt};
 
 use super::work::*;
 use self::message::*;
+use self::reader::Reader;
+use self::writer::Writer;
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, failure::Error>;
 
 mod message;
+mod writer;
+mod reader;
 #[cfg(test)]
 mod tests;
-
-#[allow(dead_code)]
-struct Writer {
-    sender: Sender<String>,
-    handle: JoinHandle<()>,
-    result: Receiver<Result<usize>>,
-}
-
-impl Writer {
-    pub fn new(stream: &TcpStream) -> Self {
-        let mut stream = stream.try_clone().unwrap();
-        let (data_tx, data_rx) = mpsc::channel();
-        let (result_tx, result_rx) = mpsc::channel();
-        let handle = thread::spawn(move || {
-            let mut data = String::new();
-            loop {
-                let _ = result_tx.send(
-                    Box::new(
-                        |rx: &Receiver<String>| -> Result<usize> {
-                            data = rx.recv().context("Writer recv err!")?;
-                            Ok(stream.write(data.as_bytes()).context("TcpSteam write err!")?)
-                        }).call_box((&data_rx, ))
-                );
-            };
-        });
-        Self {
-            sender: data_tx,
-            handle,
-            result: result_rx,
-        }
-    }
-
-    pub fn join(self) -> thread::Result<()> {
-        self.handle.join()
-    }
-}
-
-struct Reader {
-    receiver: Receiver<String>,
-    handle: JoinHandle<()>,
-}
-
-impl Reader {
-    pub fn new(stream: &TcpStream) -> Self {
-        let mut bufr = BufReader::new(stream.try_clone().unwrap());
-        let (data_tx, data_rx) = mpsc::channel();
-        let handle = thread::spawn(move || {
-            loop {
-                let mut buf = String::new();
-                if let Ok(_) = bufr.read_line(&mut buf) {
-                    if let Ok(s) = serde_json::from_str::<Action>(&buf) {
-                        println!("==> {:?}", s.params);
-                    } else if let Ok(s) = serde_json::from_str::<Respond>(&buf) {
-                        match s.result {
-                            ResultOf::Authorize(r) => if r {
-                                println!("authorized successfully!");
-                            } else {
-                                println!("authorized failed!");
-                            },
-                            ResultOf::Subscribe(r) => {
-                                let xnonce1 = r.1;
-                                let xnonce2_size = r.2;
-                                println!("xnonce1: {:?}, xnonce2_size: {}", xnonce1, xnonce2_size);
-                            }
-                        }
-                    }
-                }
-                if let Err(e) = data_tx.send(buf) {
-                    println!("Reader send err: {:?}!", e);
-                }
-            }
-        });
-        Self {
-            receiver: data_rx,
-            handle,
-        }
-    }
-
-    pub fn join(self) -> thread::Result<()> {
-        self.handle.join()
-    }
-}
 
 pub struct Pool {
     addr: String,
