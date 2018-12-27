@@ -1,4 +1,5 @@
 use super::*;
+use super::super::utils::hex_to;
 use serde::{Deserialize, Serialize};
 use bytes::Bytes;
 
@@ -35,9 +36,17 @@ pub enum ResultOf {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultOfSubscribe(
-    pub [(String, Bytes); 2],
-    pub Bytes,
-    pub u32,
+    pub [StringWithBytes; 2],   // set_difficulty & notify
+    #[serde(deserialize_with = "hex_to::bytes")]
+    pub Bytes,                  // xnonce1
+    pub u32,                    // xnonce2_size
+);
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StringWithBytes(
+    String,
+    #[serde(deserialize_with = "hex_to::bytes")]
+    Bytes,
 );
 
 pub trait ToString: serde::Serialize {
