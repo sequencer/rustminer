@@ -8,8 +8,10 @@ pub struct Reader {
 }
 
 impl Reader {
-    pub fn new(stream: &TcpStream) -> Self {
-        let mut bufr = BufReader::new(stream.try_clone().unwrap());
+    pub fn new(pool: &mut Pool) {
+        let stream = pool.try_connect().unwrap().try_clone().unwrap();
+        let xnonce = pool.xnonce.clone();
+        let mut bufr = BufReader::new(stream);
         let (data_tx, data_rx) = mpsc::channel();
         let handle = thread::spawn(move || {
             loop {
@@ -25,9 +27,10 @@ impl Reader {
                                 println!("authorized failed!");
                             },
                             ResultOf::Subscribe(r) => {
-                                let xnonce1 = r.1;
-                                let xnonce2_size = r.2;
-                                println!("xnonce1: {:?}, xnonce2_size: {}", xnonce1, xnonce2_size);
+                                let mut xnonce = xnonce.lock().unwrap();
+                                xnonce.0 = r.1;
+                                xnonce.1 = r.2;
+                                println!("set xnonce1: {:?}, xnonce2_size: {}!", xnonce.0, xnonce.1);
                             }
                         }
                     }
@@ -37,10 +40,10 @@ impl Reader {
                 }
             }
         });
-        Self {
+        pool.reader = Some(Self {
             receiver: data_rx,
             handle,
-        }
+        });
     }
 
     pub fn join(self) -> thread::Result<()> {

@@ -1,8 +1,10 @@
 use std::io;
 use std::net::TcpStream;
 use std::thread::{self, JoinHandle};
+use std::sync::{Mutex, Arc};
 use std::sync::mpsc::{self, Sender, Receiver};
 
+use bytes::Bytes;
 pub use failure::{Error, ResultExt};
 
 use super::work::*;
@@ -24,6 +26,7 @@ pub struct Pool {
     counter: u32,
     reader: Option<Reader>,
     writer: Option<Writer>,
+    xnonce: Arc<Mutex<(Bytes, u32)>>,
 }
 
 impl Pool {
@@ -34,6 +37,7 @@ impl Pool {
             counter: 0,
             reader: None,
             writer: None,
+            xnonce: Arc::new(Mutex::new((Bytes::new(), 0u32))),
         }
     }
 
@@ -79,7 +83,7 @@ impl Pool {
         match self.reader {
             Some(ref reader) => &reader.receiver,
             None => {
-                self.reader = Some(Reader::new(&self.try_connect().unwrap()));
+                Reader::new(self);
                 &self.reader.as_ref().unwrap().receiver
             }
         }
