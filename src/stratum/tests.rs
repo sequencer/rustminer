@@ -11,10 +11,10 @@ fn connect_to_tcp() {
     println!("3,{}", ret);
     let ret = pool.authorize("h723n8m.001", "");
     println!("4,{:?}", ret);
-        for received in pool.receiver() {
-            println!("received: {}", received);
-        }
-        pool.join_all();
+    for received in pool.receiver() {
+        println!("received: {}", received);
+    }
+    pool.join_all();
 }
 
 #[test]

@@ -11,6 +11,7 @@ impl Reader {
     pub fn new(pool: &mut Pool) {
         let stream = pool.try_connect().unwrap().try_clone().unwrap();
         let xnonce = pool.xnonce.clone();
+        let works = pool.works.clone();
         let mut bufr = BufReader::new(stream);
         let (data_tx, data_rx) = mpsc::channel();
         let handle = thread::spawn(move || {
@@ -18,7 +19,14 @@ impl Reader {
                 let mut buf = String::new();
                 if let Ok(_) = bufr.read_line(&mut buf) {
                     if let Ok(s) = serde_json::from_str::<Action>(&buf) {
-                        println!("==> {:?}", s.params);
+                        match s.params {
+                            Params::Work(w) => {
+                                let mut works = works.lock().unwrap();
+                                works.push(w);
+                                println!("received new work!");
+                            }
+                            _ => println!("received: {:?}", s.params)
+                        }
                     } else if let Ok(s) = serde_json::from_str::<Respond>(&buf) {
                         match s.result {
                             ResultOf::Authorize(r) => if r {
