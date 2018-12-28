@@ -22,6 +22,9 @@ impl Reader {
                         match s.params {
                             Params::Work(w) => {
                                 let mut works = works.lock().unwrap();
+                                if w.clean {
+                                    works.drain(..);
+                                }
                                 works.insert(0, w);
                                 println!("received new work!");
                             }

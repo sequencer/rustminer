@@ -27,7 +27,7 @@ pub struct Work {
     nbits: Bytes,
     #[serde(deserialize_with = "hex_to::bytes")]
     ntime: Bytes,
-    clean: bool,
+    pub clean: bool,
 }
 
 impl Work {
