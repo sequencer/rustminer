@@ -26,7 +26,7 @@ pub struct Pool {
     counter: u32,
     reader: Option<Reader>,
     writer: Option<Writer>,
-    xnonce: Arc<Mutex<(Bytes, u32)>>,
+    xnonce: Arc<Mutex<(Bytes, usize)>>,
     works: Arc<Mutex<Vec<Work>>>,
 }
 
@@ -38,7 +38,7 @@ impl Pool {
             counter: 0,
             reader: None,
             writer: None,
-            xnonce: Arc::new(Mutex::new((Bytes::new(), 0u32))),
+            xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             works: Arc::new(Mutex::new(Vec::new())),
         }
     }

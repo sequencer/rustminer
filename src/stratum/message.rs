@@ -39,7 +39,7 @@ pub struct ResultOfSubscribe(
     pub [StringWithBytes; 2],   // set_difficulty & notify
     #[serde(deserialize_with = "hex_to::bytes")]
     pub Bytes,                  // xnonce1
-    pub u32,                    // xnonce2_size
+    pub usize,                  // xnonce2_size
 );
 
 #[derive(Serialize, Deserialize, Debug)]

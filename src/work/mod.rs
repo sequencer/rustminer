@@ -31,12 +31,10 @@ pub struct Work {
 }
 
 impl Work {
-    fn merkle_root(&self, xnonce2: &Bytes) -> Bytes {
-        let xnonce1 = Bytes::from("69bf584a".from_hex().unwrap());
+    fn merkle_root(&self, xnonce: &Bytes) -> Bytes {
         let mut coinbase = Bytes::with_capacity(250);
         coinbase.extend(&self.coinbase1);
-        coinbase.extend(&xnonce1);
-        coinbase.extend(xnonce2);
+        coinbase.extend(xnonce);
         coinbase.extend(&self.coinbase2);
         let mut root = sha256d(&coinbase);
         for node in &self.merkle_branch {
@@ -46,18 +44,18 @@ impl Work {
         flip32(root)
     }
 
-    pub fn block_header(&self, xnonce2: &Bytes) -> Bytes {
+    pub fn block_header(&self, xnonce: &Bytes) -> Bytes {
         let mut ret = Bytes::with_capacity(76);
         ret.extend(&self.version);
         ret.extend(&self.prevhash);
-        ret.extend(&self.merkle_root(xnonce2));
+        ret.extend(&self.merkle_root(xnonce));
         ret.extend(&self.ntime);
         ret.extend(&self.nbits);
         ret
     }
 
-    pub fn subwork(&self, xnonce2: &Bytes) -> SubWork {
-        let block_header = self.block_header(xnonce2);
+    pub fn subwork(&self, xnonce: &Bytes) -> SubWork {
+        let block_header = self.block_header(xnonce);
         SubWork {
             midstate: sha256_midstate(&block_header[..64]),
             data2: Bytes::from(&block_header[64..]),

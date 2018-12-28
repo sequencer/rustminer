@@ -2,6 +2,7 @@ use super::*;
 
 #[test]
 fn connect_to_tcp() {
+    use std::time::Duration;
     let mut pool = Pool::new("cn.ss.btc.com:1800");
     let ret = pool.try_connect();
     println!("1,{:?}", ret);
@@ -9,12 +10,23 @@ fn connect_to_tcp() {
     println!("2,{:?}", ret);
     let ret = pool.try_read();
     println!("3,{}", ret);
-    let ret = pool.authorize("h723n8m.001", "");
+    let ret = pool.authorize("h723n8m.002", "");
     println!("4,{:?}", ret);
-    for received in pool.receiver() {
-        println!("received: {}", received);
+
+    loop {
+        if let Ok(mut works) = pool.works.clone().lock() {
+            if let Some(work) = works.pop() {
+                if let Ok(xnonce) = pool.xnonce.lock() {
+                    let subworkmaker = SubWorkMaker::new(work, &xnonce);
+                    for sw in subworkmaker {
+                        println!("{:?}", sw);
+                    }
+                }
+            } else {
+                thread::sleep(Duration::from_millis(100));
+            }
+        }
     }
-    pool.join_all();
 }
 
 #[test]

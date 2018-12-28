@@ -1,6 +1,7 @@
 use super::*;
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct SubWork {
     pub midstate: Bytes,
     pub data2: Bytes,
@@ -24,5 +25,45 @@ impl SubWork {
 
     pub fn recv_nonce(&mut self, nonce: Bytes) {
         self.nonce = Some(nonce);
+    }
+}
+
+pub struct SubWorkMaker {
+    work: Work,
+    xnonce1: Bytes,
+    xnonce2_size: usize,
+    counter: BigUint,
+}
+
+impl SubWorkMaker {
+    pub fn new(work: Work, xnonce: &(Bytes, usize)) -> Self {
+        Self {
+            work,
+            xnonce1: Bytes::from(xnonce.0.as_ref()),
+            xnonce2_size: xnonce.1,
+            counter: BigUint::from(0u32),
+        }
+    }
+
+    fn next(&mut self) -> Option<SubWork> {
+        if self.xnonce2_size < self.counter.bits() {
+            return None;
+        }
+        let size_diff = self.xnonce2_size - self.counter.bits();
+
+        let mut xnonce = Bytes::with_capacity(16);
+        xnonce.extend(&self.xnonce1);
+        xnonce.extend(vec![0u8; size_diff]);
+        xnonce.extend(self.counter.to_bytes_be());
+        self.counter += 1u32;
+        Some(self.work.subwork(&xnonce))
+    }
+}
+
+impl Iterator for SubWorkMaker {
+    type Item = SubWork;
+
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+        self.next()
     }
 }
