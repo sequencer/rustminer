@@ -1,13 +1,14 @@
 use std::io;
 use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
-use std::sync::{Mutex, Arc};
-use std::sync::mpsc::{self, Sender, Receiver};
 
 use bytes::Bytes;
 pub use failure::{Error, ResultExt};
 
 use super::work::*;
+
 use self::message::*;
 use self::reader::Reader;
 use self::writer::Writer;
@@ -75,7 +76,7 @@ impl Pool {
         match self.writer {
             Some(ref writer) => &writer.sender,
             None => {
-                self.writer = Some(Writer::new(&self.try_connect().unwrap()));
+                Writer::new(self);
                 &self.writer.as_ref().unwrap().sender
             }
         }
