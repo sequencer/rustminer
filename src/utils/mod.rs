@@ -65,4 +65,9 @@ pub mod hex_to {
         }
         Ok(bv)
     }
+
+    pub fn u32<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Ok(u32::from_str_radix(s, 16).map_err(de::Error::custom)?)
+    }
 }

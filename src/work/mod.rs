@@ -21,8 +21,8 @@ pub struct Work {
     coinbase2: Bytes,
     #[serde(deserialize_with = "hex_to::bytes_vec")]
     merkle_branch: Vec<Bytes>,
-    #[serde(deserialize_with = "hex_to::bytes")]
-    version: Bytes,
+    #[serde(deserialize_with = "hex_to::u32")]
+    version: u32,
     #[serde(deserialize_with = "hex_to::bytes")]
     nbits: Bytes,
     #[serde(deserialize_with = "hex_to::bytes")]
@@ -46,7 +46,7 @@ impl Work {
 
     pub fn block_header(&self, xnonce: &Bytes) -> Bytes {
         let mut ret = Bytes::with_capacity(76);
-        ret.extend(&self.version);
+        ret.extend(&self.version.to_be_bytes());
         ret.extend(&self.prevhash);
         ret.extend(&self.merkle_root(xnonce));
         ret.extend(&self.ntime);
