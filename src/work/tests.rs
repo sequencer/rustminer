@@ -34,4 +34,9 @@ fn get_subwork() {
     let subwork = work.subwork(&xnonce);
     assert_eq!(block_header, &subwork.block_header);
     assert_eq!(midstate, &subwork.midstate);
+
+    let chunk1_itor = Chunk1Itor::new(&work, &xnonce,0x1fffe000u32);
+    for chunk1 in chunk1_itor {
+        println!("{:?}", chunk1);
+    }
 }
