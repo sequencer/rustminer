@@ -28,7 +28,7 @@ impl Reader {
                                 works.insert(0, w);
                                 println!("received new work!");
                             }
-                            _ => println!("received: {:?}", s.params)
+                            _ => println!("=> {}: {:?}", s.method, s.params)
                         }
                     } else if let Ok(s) = serde_json::from_str::<Respond>(&buf) {
                         match s.result {

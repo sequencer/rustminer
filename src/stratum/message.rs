@@ -23,10 +23,18 @@ pub enum Params {
     Work(Work),
     Bool(bool),
     Integer([u32; 1]),
+    TMask(TMask),
     User([String; 2]),
     Config(Config),
     None(Vec<()>),
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TMask(
+    #[serde(deserialize_with = "hex_to::bytes_vec")]
+    Vec<Bytes>
+);
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config(
     pub Vec<String>,
