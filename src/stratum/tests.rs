@@ -1,11 +1,24 @@
+use serde_json::json;
+
 use super::*;
 
 #[test]
 fn connect_to_tcp() {
     use std::time::Duration;
     let mut pool = Pool::new("cn.ss.btc.com:1800");
-    let ret = pool.try_connect();
+
+    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
+    let ext_params = json!({
+            "version-rolling.mask": "1fffe000",
+            "version-rolling.min-bit-count": 2
+        });
+
+    // mining.configure
+    let ret = pool.configure(exts, ext_params);
     println!("1,{:?}", ret);
+    let ret = pool.try_read();
+    println!("1.5,{:?}", ret);
+
     let ret = pool.subscribe();
     println!("2,{:?}", ret);
     let ret = pool.try_read();

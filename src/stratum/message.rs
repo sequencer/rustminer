@@ -22,10 +22,16 @@ pub struct Respond {
 pub enum Params {
     Work(Work),
     Bool(bool),
-    Difficulty([u32; 1]),
+    Integer([u32; 1]),
     User([String; 2]),
+    Config(Config),
     None(Vec<()>),
 }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Config(
+    pub Vec<String>,
+    pub serde_json::Value,
+);
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]

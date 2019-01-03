@@ -102,6 +102,16 @@ impl Pool {
         self.receiver().recv().unwrap()
     }
 
+    pub fn configure(&mut self, exts: Vec<String>, ext_params: serde_json::Value) -> Result<()> {
+        let msg = Action {
+            id: Some(1),
+            method: String::from("mining.configure"),
+            params: Params::Config(Config(exts, ext_params)),
+        };
+
+        self.try_send(&msg)
+    }
+
     pub fn subscribe(&mut self) -> Result<()> {
         let msg = Action {
             id: self.counter(),
