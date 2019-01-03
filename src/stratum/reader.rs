@@ -1,6 +1,7 @@
 use std::io::{BufReader, BufRead};
 
 use super::*;
+use super::super::utils::hex_to;
 
 pub struct Reader {
     pub receiver: Receiver<String>,
@@ -12,6 +13,7 @@ impl Reader {
         let stream = pool.try_connect().unwrap().try_clone().unwrap();
         let xnonce = pool.xnonce.clone();
         let works = pool.works.clone();
+        let vermask = pool.vermask.clone();
         let mut bufr = BufReader::new(stream);
         let (data_tx, data_rx) = mpsc::channel();
         let handle = thread::spawn(move || {
@@ -41,7 +43,25 @@ impl Reader {
                                 let mut xnonce = xnonce.lock().unwrap();
                                 xnonce.0 = r.1;
                                 xnonce.1 = r.2;
-                                println!("set xnonce1: {:?}, xnonce2_size: {}!", xnonce.0, xnonce.1);
+                                println!("=> set xnonce1: {:?}, xnonce2_size: {}!", xnonce.0, xnonce.1);
+                            },
+                            ResultOf::Configure(r) => {
+                                if let Some(result) = r.get("version-rolling") {
+                                    if let serde_json::Value::Bool(result) = result {
+                                        if *result {
+                                            let mut vermask = vermask.lock().unwrap();
+                                            let mask = hex_to::bytes(
+                                                r.get("version-rolling.mask").unwrap()
+                                            ).unwrap();
+                                            *vermask = Some(mask);
+                                            println!("=> set vermask: {:?}!", *vermask);
+                                        } else {
+                                            println!("the pool does not support version-rolling!");
+                                        }
+                                    } else if let serde_json::Value::String(e) = result {
+                                        println!("the pool does not support version-rolling: {:?}!", e);
+                                    }
+                                }
                             }
                         }
                     }

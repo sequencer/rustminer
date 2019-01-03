@@ -44,6 +44,7 @@ pub struct Config(
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum ResultOf {
+    Configure(serde_json::map::Map<String, serde_json::Value>),
     Authorize(bool),
     Subscribe(ResultOfSubscribe),
 }

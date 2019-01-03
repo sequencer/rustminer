@@ -29,6 +29,7 @@ pub struct Pool {
     writer: Option<Writer>,
     xnonce: Arc<Mutex<(Bytes, usize)>>,
     works: Arc<Mutex<Vec<Work>>>,
+    vermask: Arc<Mutex<Option<Bytes>>>,
 }
 
 impl Pool {
@@ -41,6 +42,7 @@ impl Pool {
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             works: Arc::new(Mutex::new(Vec::new())),
+            vermask:  Arc::new(Mutex::new(None)),
         }
     }
 
