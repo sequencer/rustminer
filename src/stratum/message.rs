@@ -64,10 +64,10 @@ pub struct StringWithBytes(
     Bytes,
 );
 
-pub trait ToString: serde::Serialize {
+pub trait ToJsonString: serde::Serialize {
     fn to_string(&self) -> serde_json::Result<String> {
         serde_json::to_string(&self)
     }
 }
 
-impl<T: serde::Serialize> ToString for T {}
+impl<T: serde::Serialize> ToJsonString for T {}

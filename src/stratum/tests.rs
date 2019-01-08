@@ -44,7 +44,7 @@ fn connect_to_tcp() {
 
 #[test]
 fn serialize_json_data() {
-    use self::ToString;
+    use self::ToJsonString;
 
     let msg = Action {
         id: Some(1),
