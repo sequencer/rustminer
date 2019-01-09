@@ -2,6 +2,7 @@ use ring::digest;
 use bytes::Bytes;
 
 pub mod hex;
+pub mod serial;
 pub use self::hex::FromHex;
 
 pub fn sha256d(data: &Bytes) -> Bytes {
