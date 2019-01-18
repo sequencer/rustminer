@@ -1,7 +1,7 @@
 use std::io::{BufReader, BufRead};
 
 use super::*;
-use super::super::utils::hex_to;
+use super::super::util::hex_to;
 
 pub struct Reader {
     pub receiver: Receiver<String>,

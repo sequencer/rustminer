@@ -1,5 +1,5 @@
 use super::*;
-use super::super::utils::hex_to;
+use super::super::util::hex_to;
 use serde::{Deserialize, Serialize};
 use bytes::Bytes;
 

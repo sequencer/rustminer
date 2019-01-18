@@ -1,5 +1,5 @@
 #![feature(fnbox)]
 
-mod utils;
+mod util;
 pub mod work;
 pub mod stratum;

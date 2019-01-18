@@ -2,7 +2,7 @@ use bytes::Bytes;
 use num_bigint::BigUint;
 use serde::{Serialize, Deserialize};
 
-use super::utils::*;
+use super::util::*;
 pub use self::subwork::*;
 
 mod subwork;
