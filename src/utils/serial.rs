@@ -1,9 +1,8 @@
-use std::io::BufReader;
 use std::path::Path;
 
 use bytes::BytesMut;
 use tokio::io;
-use tokio_codec::{Decoder, Encoder};
+use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, FlowControl, SerialPortSettings};
 use crc::Crc;
 use lazy_static::lazy_static;
@@ -23,7 +22,7 @@ fn crc5usb_check(data: &[u8]) -> bool {
     }
 }
 
-struct Codec;
+pub struct Codec;
 
 impl Decoder for Codec {
     type Item = BytesMut;
@@ -39,10 +38,10 @@ impl Decoder for Codec {
 //        }
         if let Some(n) = src.iter().position(|b| *b == 0x55) {
             if src.len() >= n + 7 {
-                let item = &src[n..n+7];
+                let item = &src[n..n + 7];
 //                print_hex(item);
                 if crc5usb_check(item) {
-                    return Ok(Some(src.split_to(n+7).split_off(n)));
+                    return Ok(Some(src.split_to(n + 7).split_off(n)));
                 } else {
                     src.split_to(n);
                 }
@@ -56,9 +55,22 @@ impl Encoder for Codec {
     type Item = BytesMut;
     type Error = io::Error;
 
-    fn encode(&mut self, _item: Self::Item, _dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        dst.clone_from(&item);
         Ok(())
     }
+}
+
+pub fn serial_framed<T: AsRef<Path>>(path: T) -> Framed<Serial, Codec> {
+    let mut s = SerialPortSettings::default();
+    s.baud_rate = 115200;
+    s.flow_control = FlowControl::Software;
+
+    let mut port = Serial::from_path(path, &s).unwrap();
+    #[cfg(unix)]
+        port.set_exclusive(false).expect("set_exclusive(false) failed!");
+
+    Codec.framed(port)
 }
 
 #[test]
@@ -70,17 +82,11 @@ fn serial_receive() {
     #[cfg(windows)]
     const PORT: &str = "COM1";
 
-    let mut s = SerialPortSettings::default();
-    s.baud_rate = 115200;
-    s.flow_control = FlowControl::Software;
+//    let (_, reader) = Codec.framed(
+//        tokio::fs::File::from_std(std::fs::File::open("/tmp/port").unwrap())
+//    ).split();
 
-    let mut port = Serial::from_path(PORT, &s).unwrap();
-    #[cfg(unix)]
-        port.set_exclusive(false).expect("set_exclusive(false) failed!");
-
-//    let mut port = tokio::fs::File::from_std(std::fs::File::open("/tmp/port").unwrap());
-
-    let (_, reader) = port.framed(Codec).split();
+    let (_, reader) = serial_framed(PORT).split();
     let printer = reader
         .for_each(|s| {
             println!("received {} bytes: {:?}", s.len(), s);
