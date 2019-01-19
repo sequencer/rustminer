@@ -27,9 +27,9 @@ pub struct Pool {
     counter: u32,
     reader: Option<Reader>,
     writer: Option<Writer>,
-    xnonce: Arc<Mutex<(Bytes, usize)>>,
-    works: Arc<Mutex<Vec<Work>>>,
-    vermask: Arc<Mutex<Option<Bytes>>>,
+    pub xnonce: Arc<Mutex<(Bytes, usize)>>,
+    pub works: Arc<Mutex<Vec<Work>>>,
+    pub vermask: Arc<Mutex<Option<Bytes>>>,
 }
 
 impl Pool {
