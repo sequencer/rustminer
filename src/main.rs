@@ -33,13 +33,11 @@ fn main() {
     let ret = pool.authorize("h723n8m.002", "");
     println!("4,{:?}", ret);
 
-    let wds = WorkDequeStream { works: &pool.works };
-    let task = wds
+    let ws = WorkStream(pool.works.clone());
+    let task = ws
         .for_each(|w| {
             println!("{:?}", w);
             Ok(())
         });
-    let mut runtime = Runtime::new().unwrap();
-
-    runtime.block_on(task).unwrap();
+    tokio::run(task);
 }

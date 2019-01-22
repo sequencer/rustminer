@@ -49,17 +49,15 @@ impl DerefMut for WorkDeque {
 }
 
 #[derive(Debug)]
-pub struct WorkDequeStream<'a> {
-    pub works: &'a Arc<Mutex<WorkDeque>>
-}
+pub struct WorkStream(pub Arc<Mutex<WorkDeque>>);
 
-impl<'a> Stream for WorkDequeStream<'a> {
+impl Stream for WorkStream {
     type Item = Work;
     type Error = ();
 
     fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
         dbg!(&self);
-        match self.works.lock().unwrap().pop_front() {
+        match self.0.lock().unwrap().pop_front() {
             Some(w) => Ok(Async::Ready(Some(w))),
             None => Ok(Async::NotReady)
         }
