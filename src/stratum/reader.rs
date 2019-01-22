@@ -25,9 +25,13 @@ impl Reader {
                             Params::Work(w) => {
                                 let mut works = works.lock().unwrap();
                                 if w.clean {
-                                    works.clear();
+                                    works.0.clear();
                                 }
-                                works.push_back(w);
+                                works.0.push_back(w);
+                                match &works.1 {
+                                    Some(t) => t.notify(),
+                                    None => ()
+                                }
                                 println!("received new work!");
                             }
                             _ => println!("=> {}: {:?}", s.method, s.params)
