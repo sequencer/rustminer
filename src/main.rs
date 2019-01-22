@@ -1,15 +1,14 @@
 #![feature(fnbox)]
 
-use std::thread;
-use std::time::Duration;
 
 use serde_json::json;
+use tokio::prelude::*;
+use tokio::runtime::current_thread::Runtime;
 
 mod util;
 pub mod work;
 pub mod stratum;
 
-use self::work::*;
 use self::stratum::*;
 
 fn main() {
@@ -34,18 +33,13 @@ fn main() {
     let ret = pool.authorize("h723n8m.002", "");
     println!("4,{:?}", ret);
 
-    loop {
-        if let Ok(mut works) = pool.works.clone().lock() {
-            if let Some(work) = works.pop() {
-                if let Ok(xnonce) = pool.xnonce.lock() {
-                    let subworkmaker = SubWorkMaker::new(work, &xnonce);
-                    for sw in subworkmaker {
-                        println!("{:?}", sw);
-                    }
-                }
-            } else {
-                thread::sleep(Duration::from_millis(100));
-            }
-        }
-    }
+    let wds = WorkDequeStream { works: &pool.works };
+    let task = wds
+        .for_each(|w| {
+            println!("{:?}", w);
+            Ok(())
+        });
+    let mut runtime = Runtime::new().unwrap();
+
+    runtime.block_on(task).unwrap();
 }

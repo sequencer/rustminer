@@ -25,9 +25,9 @@ impl Reader {
                             Params::Work(w) => {
                                 let mut works = works.lock().unwrap();
                                 if w.clean {
-                                    works.drain(..);
+                                    works.clear();
                                 }
-                                works.insert(0, w);
+                                works.push_back(w);
                                 println!("received new work!");
                             }
                             _ => println!("=> {}: {:?}", s.method, s.params)
@@ -44,7 +44,7 @@ impl Reader {
                                 xnonce.0 = r.1;
                                 xnonce.1 = r.2;
                                 println!("=> set xnonce1: {:?}, xnonce2_size: {}!", xnonce.0, xnonce.1);
-                            },
+                            }
                             ResultOf::Configure(r) => {
                                 if let Some(result) = r.get("version-rolling") {
                                     if let serde_json::Value::Bool(result) = result {

@@ -3,9 +3,13 @@ use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
+use std::collections::VecDeque;
+use std::ops::{Deref, DerefMut};
 
 use bytes::Bytes;
 pub use failure::{Error, ResultExt};
+use futures::stream::Stream;
+use futures::Async;
 
 use super::work::*;
 
@@ -21,6 +25,47 @@ mod reader;
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug)]
+pub struct WorkDeque(VecDeque<Work>);
+
+impl WorkDeque {
+    pub fn new() -> Self {
+        Self(VecDeque::new())
+    }
+}
+
+impl Deref for WorkDeque {
+    type Target = VecDeque<Work>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for WorkDeque {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[derive(Debug)]
+pub struct WorkDequeStream<'a> {
+    pub works: &'a Arc<Mutex<WorkDeque>>
+}
+
+impl<'a> Stream for WorkDequeStream<'a> {
+    type Item = Work;
+    type Error = ();
+
+    fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
+        dbg!(&self);
+        match self.works.lock().unwrap().pop_front() {
+            Some(w) => Ok(Async::Ready(Some(w))),
+            None => Ok(Async::NotReady)
+        }
+    }
+}
+
 pub struct Pool {
     addr: String,
     stream: Option<TcpStream>,
@@ -28,7 +73,7 @@ pub struct Pool {
     reader: Option<Reader>,
     writer: Option<Writer>,
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
-    pub works: Arc<Mutex<Vec<Work>>>,
+    pub works: Arc<Mutex<WorkDeque>>,
     pub vermask: Arc<Mutex<Option<Bytes>>>,
 }
 
@@ -41,8 +86,8 @@ impl Pool {
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
-            works: Arc::new(Mutex::new(Vec::new())),
-            vermask:  Arc::new(Mutex::new(None)),
+            works: Arc::new(Mutex::new(WorkDeque::new())),
+            vermask: Arc::new(Mutex::new(None)),
         }
     }
 
