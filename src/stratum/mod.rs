@@ -9,7 +9,6 @@ use std::ops::{Deref, DerefMut};
 use bytes::Bytes;
 pub use failure::{Error, ResultExt};
 use futures::stream::Stream;
-use futures::future::Future;
 use futures::task::Task;
 use futures::{Async, Poll};
 
@@ -50,18 +49,6 @@ impl DerefMut for WorkDeque {
     }
 }
 
-impl Future for WorkDeque {
-    type Item = Work;
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.pop_front() {
-            Some(w) => return Ok(Async::Ready(w)),
-            None => Ok(Async::NotReady)
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct WorkStream(pub Arc<Mutex<(WorkDeque, Option<Task>)>>);
 
@@ -71,13 +58,12 @@ impl Stream for WorkStream {
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         let mut works = self.0.lock().unwrap();
-        match works.0.poll() {
-            Ok(Async::Ready(w)) => Ok(Async::Ready(Some(w))),
-            Ok(Async::NotReady) => {
+        match works.0.pop_front() {
+            Some(w) => Ok(Async::Ready(Some(w))),
+            None => {
                 works.1 = Some(futures::task::current());
                 Ok(Async::NotReady)
             }
-            Err(_) => Err(())
         }
     }
 }
