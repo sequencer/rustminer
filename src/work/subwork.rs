@@ -64,14 +64,6 @@ impl SubWorkMaker {
     }
 }
 
-impl Iterator for SubWorkMaker {
-    type Item = SubWork;
-
-    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        self.next()
-    }
-}
-
 impl Stream for SubWorkMaker {
     type Item = SubWork;
     type Error = std::io::Error;
