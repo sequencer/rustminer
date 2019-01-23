@@ -1,5 +1,8 @@
 use super::*;
 
+use futures::stream::Stream;
+use futures::{Async, Poll};
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct SubWork {
@@ -28,6 +31,7 @@ impl SubWork {
     }
 }
 
+#[derive(Debug)]
 pub struct SubWorkMaker {
     work: Work,
     xnonce1: Bytes,
@@ -65,5 +69,17 @@ impl Iterator for SubWorkMaker {
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         self.next()
+    }
+}
+
+impl Stream for SubWorkMaker {
+    type Item = SubWork;
+    type Error = std::io::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        match self.next() {
+            Some(sw) => Ok(Async::Ready(Some(sw))),
+            None => Ok(Async::Ready(None))
+        }
     }
 }
