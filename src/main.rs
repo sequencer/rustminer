@@ -65,11 +65,10 @@ fn main() {
                             })
                             .map_err(failure::Error::from)
                     })
-                    .map_err(|e| eprintln!("{:}", e));
-                tokio::spawn(send_subwork);
-
-                Ok(())
-            });
+                    .map_err(|e| eprintln!("{}", e));
+                send_subwork
+            })
+            .map_err(|_| ());
 
         receive_from_asic.join(send_to_asic).then(|_| Ok(()))
     };
