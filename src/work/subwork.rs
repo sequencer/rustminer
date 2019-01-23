@@ -66,7 +66,7 @@ impl SubWorkMaker {
 
 impl Stream for SubWorkMaker {
     type Item = SubWork;
-    type Error = std::io::Error;
+    type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match self.next() {

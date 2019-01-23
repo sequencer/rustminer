@@ -1,8 +1,10 @@
 #![feature(fnbox)]
 
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use tokio::prelude::*;
+use tokio::timer::Delay;
 
 mod util;
 pub mod work;
@@ -53,13 +55,17 @@ fn main() {
 
                 let send_subwork = SubWorkMaker::new(w, &xnonce)
                     .for_each(move |sw| {
-                        let mut sink = sink.lock().unwrap();
-                        sink.start_send(sw).unwrap();
-                        sink.poll_complete().unwrap();
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                        Ok(())
+                        let sink = sink.clone();
+                        Delay::new(Instant::now() + Duration::from_millis(500))
+                            .and_then(move |_| {
+                                let mut sink = sink.lock().unwrap();
+                                sink.start_send(sw).unwrap();
+                                sink.poll_complete().unwrap();
+                                Ok(())
+                            })
+                            .map_err(failure::Error::from)
                     })
-                    .map_err(|e| eprintln!("{}", e));
+                    .map_err(|e| eprintln!("{:}", e));
                 tokio::spawn(send_subwork);
 
                 Ok(())
