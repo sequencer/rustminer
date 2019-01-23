@@ -1,11 +1,13 @@
 use std::path::Path;
 
-use bytes::BytesMut;
+use bytes::{BytesMut, BufMut};
 use tokio::io;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, FlowControl, SerialPortSettings};
 use crc::Crc;
 use lazy_static::lazy_static;
+
+use super::super::work::SubWork;
 
 fn crc5usb(data: &[u8]) -> u8 {
     lazy_static!(static ref CRC5_USB: Crc<u8> = Crc::<u8>::new(0x05, 5, 0x1f, 0x1f, true););
@@ -22,7 +24,23 @@ fn crc5usb_check(data: &[u8]) -> bool {
     }
 }
 
-pub struct Codec;
+fn crc16_ccitt_false(data: &[u8]) -> u16 {
+    lazy_static!(static ref CRC16_CCITT_FALSE: Crc<u16> = Crc::<u16>::new(0x1021, 16, 0xffff, 0, false););
+    let crc = &mut 0u16;
+    CRC16_CCITT_FALSE.init_crc(crc);
+    CRC16_CCITT_FALSE.update_crc(crc, data)
+}
+
+#[derive(Debug)]
+pub struct Codec {
+    workid: u8
+}
+
+impl Codec {
+    pub fn new() -> Self {
+        Self { workid: 0 }
+    }
+}
 
 impl Decoder for Codec {
     type Item = BytesMut;
@@ -52,11 +70,16 @@ impl Decoder for Codec {
 }
 
 impl Encoder for Codec {
-    type Item = BytesMut;
+    type Item = SubWork;
     type Error = io::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        dst.clone_from(&item);
+        dst.extend(b"\x20\x31");
+        dst.put_u8(self.workid);
+        self.workid = self.workid.wrapping_add(1);
+        dst.extend(&item.data2);
+        dst.extend(&item.midstate);
+        dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
         Ok(())
     }
 }
@@ -70,7 +93,7 @@ pub fn serial_framed<T: AsRef<Path>>(path: T) -> Framed<Serial, Codec> {
     #[cfg(unix)]
         port.set_exclusive(false).expect("set_exclusive(false) failed!");
 
-    Codec.framed(port)
+    Codec::new().framed(port)
 }
 
 #[test]
