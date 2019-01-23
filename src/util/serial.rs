@@ -31,6 +31,14 @@ fn crc16_ccitt_false(data: &[u8]) -> u16 {
     CRC16_CCITT_FALSE.update_crc(crc, data)
 }
 
+fn _print_hex(data: &[u8]) {
+    print!("{}", "0x");
+    for b in data {
+        print!("{:02x}", b);
+    }
+    println!();
+}
+
 #[derive(Debug)]
 pub struct Codec {
     workid: u8
@@ -47,17 +55,10 @@ impl Decoder for Codec {
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<<Self as Decoder>::Item>, <Self as Decoder>::Error> {
-//        fn print_hex(data: &[u8]) {
-//            print!("{}", "0x");
-//            for b in data {
-//                print!("{:02x}", b);
-//            }
-//            println!();
-//        }
         if let Some(n) = src.iter().position(|b| *b == 0x55) {
             if src.len() >= n + 7 {
                 let item = &src[n..n + 7];
-//                print_hex(item);
+//                _print_hex(item);
                 if crc5usb_check(item) {
                     return Ok(Some(src.split_to(n + 7).split_off(n)));
                 } else {
@@ -80,6 +81,8 @@ impl Encoder for Codec {
         dst.extend(&item.data2);
         dst.extend(&item.midstate);
         dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
+        print!("subwork: ");
+        _print_hex(dst.as_ref());
         Ok(())
     }
 }

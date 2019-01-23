@@ -1,7 +1,7 @@
 #![feature(fnbox)]
 
+use std::sync::{Arc, Mutex};
 
-use serde_json::json;
 use tokio::prelude::*;
 
 mod util;
@@ -16,7 +16,7 @@ fn main() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
 
     let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
-    let ext_params = json!({
+    let ext_params = serde_json::json!({
             "version-rolling.mask": "1fffe000",
             "version-rolling.min-bit-count": 2
         });
@@ -36,24 +36,37 @@ fn main() {
 
     let ws = WorkStream(pool.works.clone());
     let xnonce = pool.xnonce.clone();
-    let task = ws
-        .for_each(move |w| {
-            let xnonce = xnonce.lock().unwrap();
-            let (sink, stream) = serial_framed("/dev/ttyUSB0").split();
-            let send_to_asic = SubWorkMaker::new(w, &xnonce)
-                .forward(sink)
-                .then(|_| Ok(()));
-            tokio::spawn(send_to_asic);
+    let (sink, stream) = serial_framed("/dev/ttyUSB0").split();
+    let sink = Arc::new(Mutex::new(sink));
 
-            let receive_from_asic = stream
-                .for_each(|s| {
-                    println!("received {} bytes: {:?}", s.len(), s);
-                    Ok(())
-                }).map_err(|e| eprintln!("{}", e));
-            tokio::spawn(receive_from_asic);
+    let task = {
+        let receive_from_asic = stream
+            .for_each(|s| {
+                println!("received {} bytes: {:?}", s.len(), s);
+                Ok(())
+            }).map_err(|e| eprintln!("{}", e));
 
-            Ok(())
-        });
+        let send_to_asic = ws
+            .for_each(move |w| {
+                let xnonce = xnonce.lock().unwrap();
+                let sink = sink.clone();
+
+                let send_subwork = SubWorkMaker::new(w, &xnonce)
+                    .for_each(move |sw| {
+                        let mut sink = sink.lock().unwrap();
+                        sink.start_send(sw).unwrap();
+                        sink.poll_complete().unwrap();
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        Ok(())
+                    })
+                    .map_err(|e| eprintln!("{}", e));
+                tokio::spawn(send_subwork);
+
+                Ok(())
+            });
+
+        receive_from_asic.join(send_to_asic).then(|_| Ok(()))
+    };
 
     tokio::run(task);
 }
