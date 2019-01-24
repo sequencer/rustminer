@@ -56,7 +56,7 @@ fn main() {
                 let send_subwork = SubWorkMaker::new(w, &xnonce)
                     .for_each(move |sw| {
                         let sink = sink.clone();
-                        Delay::new(Instant::now() + Duration::from_millis(500))
+                        Delay::new(Instant::now() + Duration::from_millis(100))
                             .and_then(move |_| {
                                 let mut sink = sink.lock().unwrap();
                                 sink.start_send(sw).unwrap();

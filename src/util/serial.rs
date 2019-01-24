@@ -3,7 +3,7 @@ use std::path::Path;
 use bytes::{BytesMut, BufMut};
 use tokio::io;
 use tokio_codec::{Decoder, Encoder, Framed};
-use tokio_serial::{Serial, FlowControl, SerialPortSettings};
+use tokio_serial::{Serial, SerialPortSettings};
 use crc::Crc;
 use lazy_static::lazy_static;
 
@@ -90,7 +90,6 @@ impl Encoder for Codec {
 pub fn serial_framed<T: AsRef<Path>>(path: T) -> Framed<Serial, Codec> {
     let mut s = SerialPortSettings::default();
     s.baud_rate = 115200;
-    s.flow_control = FlowControl::Software;
 
     let mut port = Serial::from_path(path, &s).unwrap();
     #[cfg(unix)]
