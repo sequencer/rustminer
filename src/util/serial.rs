@@ -17,11 +17,7 @@ fn crc5usb(data: &[u8]) -> u8 {
 }
 
 fn crc5usb_check(data: &[u8]) -> bool {
-    if crc5usb(data) == 1 {
-        true
-    } else {
-        false
-    }
+    crc5usb(data) == 1
 }
 
 fn crc16_ccitt_false(data: &[u8]) -> u16 {
@@ -32,22 +28,16 @@ fn crc16_ccitt_false(data: &[u8]) -> u16 {
 }
 
 fn _print_hex(data: &[u8]) {
-    print!("{}", "0x");
+    print!("0x");
     for b in data {
         print!("{:02x}", b);
     }
     println!();
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Codec {
     workid: u8
-}
-
-impl Codec {
-    pub fn new() -> Self {
-        Self { workid: 0 }
-    }
 }
 
 impl Decoder for Codec {
@@ -89,13 +79,13 @@ impl Encoder for Codec {
 
 pub fn serial_framed<T: AsRef<Path>>(path: T) -> Framed<Serial, Codec> {
     let mut s = SerialPortSettings::default();
-    s.baud_rate = 115200;
+    s.baud_rate = 115_200;
 
     let mut port = Serial::from_path(path, &s).unwrap();
     #[cfg(unix)]
         port.set_exclusive(false).expect("set_exclusive(false) failed!");
 
-    Codec::new().framed(port)
+    Codec::default().framed(port)
 }
 
 #[test]

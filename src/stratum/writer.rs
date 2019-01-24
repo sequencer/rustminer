@@ -11,7 +11,7 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn new(pool: &mut Pool) {
+    pub fn spawn(pool: &mut Pool) {
         let stream = pool.try_connect().unwrap().try_clone().unwrap();
         let mut linew = LineWriter::new(stream);
         let (data_tx, data_rx) = mpsc::channel();

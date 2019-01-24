@@ -26,14 +26,8 @@ mod reader;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WorkDeque(VecDeque<Work>);
-
-impl WorkDeque {
-    pub fn new() -> Self {
-        Self(VecDeque::new())
-    }
-}
 
 impl Deref for WorkDeque {
     type Target = VecDeque<Work>;
@@ -88,7 +82,7 @@ impl Pool {
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
-            works: Arc::new(Mutex::new((WorkDeque::new(), None))),
+            works: Arc::new(Mutex::new((WorkDeque::default(), None))),
             vermask: Arc::new(Mutex::new(None)),
         }
     }
@@ -101,7 +95,7 @@ impl Pool {
     }
 
     fn counter(&mut self) -> Option<u32> {
-        self.counter = self.counter + 1;
+        self.counter += 1;
         Some(self.counter)
     }
 
@@ -125,7 +119,7 @@ impl Pool {
         match self.writer {
             Some(ref writer) => &writer.sender,
             None => {
-                Writer::new(self);
+                Writer::spawn(self);
                 &self.writer.as_ref().unwrap().sender
             }
         }
@@ -135,7 +129,7 @@ impl Pool {
         match self.reader {
             Some(ref reader) => &reader.receiver,
             None => {
-                Reader::new(self);
+                Reader::spawn(self);
                 &self.reader.as_ref().unwrap().receiver
             }
         }

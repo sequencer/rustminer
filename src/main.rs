@@ -53,9 +53,11 @@ fn main() {
                 let xnonce = xnonce.lock().unwrap();
                 let sink = sink.clone();
 
-                let send_subwork = SubWorkMaker::new(w, &xnonce)
+                // send_subwork
+                SubWorkMaker::new(w, &xnonce)
                     .for_each(move |sw| {
                         let sink = sink.clone();
+                        // delay_send
                         Delay::new(Instant::now() + Duration::from_millis(100))
                             .and_then(move |_| {
                                 let mut sink = sink.lock().unwrap();
@@ -65,8 +67,7 @@ fn main() {
                             })
                             .map_err(failure::Error::from)
                     })
-                    .map_err(|e| eprintln!("{}", e));
-                send_subwork
+                    .map_err(|e| eprintln!("{}", e))
             })
             .map_err(|_| ());
 

@@ -19,7 +19,7 @@ impl SubWork {
     }
 
     pub fn diff(&self) -> BigUint {
-        static NUM: [u32; 7] = [0xffffffffu32; 7];
+        static NUM: [u32; 7] = [0xffff_ffff; 7];
         let mut temp = Bytes::new();
         temp.extend(&self.block_header);
         temp.extend(self.nonce.as_ref().unwrap());

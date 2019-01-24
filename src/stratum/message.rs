@@ -17,6 +17,7 @@ pub struct Respond {
     pub error: serde_json::Value,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Params {

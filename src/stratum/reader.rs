@@ -9,7 +9,7 @@ pub struct Reader {
 }
 
 impl Reader {
-    pub fn new(pool: &mut Pool) {
+    pub fn spawn(pool: &mut Pool) {
         let stream = pool.try_connect().unwrap().try_clone().unwrap();
         let xnonce = pool.xnonce.clone();
         let works = pool.works.clone();
@@ -19,7 +19,7 @@ impl Reader {
         let handle = thread::spawn(move || {
             loop {
                 let mut buf = String::new();
-                if let Ok(_) = bufr.read_line(&mut buf) {
+                if bufr.read_line(&mut buf).is_ok() {
                     if let Ok(s) = serde_json::from_str::<Action>(&buf) {
                         match s.params {
                             Params::Work(w) => {
