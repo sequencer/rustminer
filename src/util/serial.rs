@@ -7,7 +7,7 @@ use tokio_serial::{Serial, SerialPortSettings};
 use crc::Crc;
 use lazy_static::lazy_static;
 
-use super::super::work::SubWork;
+use super::super::work::Subwork;
 
 fn crc5usb(data: &[u8]) -> u8 {
     lazy_static!(static ref CRC5_USB: Crc<u8> = Crc::<u8>::new(0x05, 5, 0x1f, 0x1f, true););
@@ -38,14 +38,14 @@ fn _print_hex(data: &[u8]) {
 #[derive(Debug)]
 pub struct Codec {
     workid: u8,
-    works: Vec<SubWork>,
+    works: Vec<Subwork>,
 }
 
 impl Default for Codec {
     fn default() -> Self {
         Self {
             workid: 0,
-            works: vec![SubWork::default(); 256]
+            works: vec![Subwork::default(); 256]
         }
     }
 }
@@ -71,7 +71,7 @@ impl Decoder for Codec {
 }
 
 impl Encoder for Codec {
-    type Item = SubWork;
+    type Item = Subwork;
     type Error = io::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {

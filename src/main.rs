@@ -54,7 +54,7 @@ fn main() {
                 let sink = sink.clone();
 
                 // send_subwork
-                SubWorkMaker::new(w, &xnonce)
+                SubworkMaker::new(w, &xnonce)
                     .for_each(move |sw| {
                         let sink = sink.clone();
                         // delay_send

@@ -54,9 +54,9 @@ impl Work {
         ret
     }
 
-    pub fn subwork(&self, xnonce: &Bytes) -> SubWork {
+    pub fn subwork(&self, xnonce: &Bytes) -> Subwork {
         let block_header = self.block_header(xnonce);
-        SubWork {
+        Subwork {
             midstate: sha256_midstate(&block_header[..64]),
             data2: Bytes::from(&block_header[64..]),
             block_header,

@@ -5,7 +5,7 @@ use futures::{Async, Poll};
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
-pub struct SubWork {
+pub struct Subwork {
     pub midstate: Bytes,
     pub data2: Bytes,
     pub block_header: Bytes,
@@ -13,7 +13,7 @@ pub struct SubWork {
 }
 
 #[allow(dead_code)]
-impl SubWork {
+impl Subwork {
     pub fn send_to_asic(&self) {
         unimplemented!();
     }
@@ -32,14 +32,14 @@ impl SubWork {
 }
 
 #[derive(Debug)]
-pub struct SubWorkMaker {
+pub struct SubworkMaker {
     work: Work,
     xnonce1: Bytes,
     xnonce2_size: usize,
     counter: BigUint,
 }
 
-impl SubWorkMaker {
+impl SubworkMaker {
     pub fn new(work: Work, xnonce: &(Bytes, usize)) -> Self {
         Self {
             work,
@@ -49,7 +49,7 @@ impl SubWorkMaker {
         }
     }
 
-    fn next(&mut self) -> Option<SubWork> {
+    fn next(&mut self) -> Option<Subwork> {
         if self.xnonce2_size < self.counter.bits() {
             return None;
         }
@@ -64,8 +64,8 @@ impl SubWorkMaker {
     }
 }
 
-impl Stream for SubWorkMaker {
-    type Item = SubWork;
+impl Stream for SubworkMaker {
+    type Item = Subwork;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
