@@ -4,7 +4,7 @@ use futures::stream::Stream;
 use futures::{Async, Poll};
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SubWork {
     pub midstate: Bytes,
     pub data2: Bytes,

@@ -35,9 +35,19 @@ fn _print_hex(data: &[u8]) {
     println!();
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Codec {
-    workid: u8
+    workid: u8,
+    works: Vec<SubWork>,
+}
+
+impl Default for Codec {
+    fn default() -> Self {
+        Self {
+            workid: 0,
+            works: vec![SubWork::default(); 256]
+        }
+    }
 }
 
 impl Decoder for Codec {
@@ -67,10 +77,12 @@ impl Encoder for Codec {
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
         dst.extend(b"\x20\x31");
         dst.put_u8(self.workid);
-        self.workid = self.workid.wrapping_add(1);
         dst.extend(&item.data2);
         dst.extend(&item.midstate);
         dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
+        self.works[self.workid as usize] = item;
+        self.workid = self.workid.wrapping_add(1);
+        // debug
         print!("subwork: ");
         _print_hex(dst.as_ref());
         Ok(())
