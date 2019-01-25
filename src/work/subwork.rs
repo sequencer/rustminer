@@ -3,6 +3,8 @@ use super::*;
 use futures::stream::Stream;
 use futures::{Async, Poll};
 
+use super::super::stratum::Params;
+
 #[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
 pub struct Subwork {
@@ -25,6 +27,10 @@ impl Subwork {
         temp.extend(&self.block_header);
         temp.extend(nonce);
         BigUint::from_slice(&NUM) / BigUint::from_bytes_be(flip32(temp).as_ref())
+    }
+
+    pub fn into_params(self, name: &str, nonce: Bytes) -> Params {
+        Params::Submit([Bytes::from(name), self.workid, self.xnonce2, self.block_header, nonce])
     }
 }
 
@@ -56,7 +62,7 @@ impl SubworkMaker {
         xnonce2.extend(vec![0u8; size_diff]);
         xnonce2.extend(self.counter.to_bytes_be());
         self.counter += 1u32;
-        Some(self.work.subwork((&self.xnonce1,xnonce2)))
+        Some(self.work.subwork((&self.xnonce1, xnonce2)))
     }
 }
 

@@ -15,6 +15,7 @@ use futures::{Async, Poll};
 use super::work::*;
 
 use self::message::*;
+pub use self::message::Params;
 use self::reader::Reader;
 use self::writer::Writer;
 

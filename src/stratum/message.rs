@@ -27,6 +27,7 @@ pub enum Params {
     TMask(TMask),
     User([String; 2]),
     Config(Config),
+    Submit([Bytes; 5]),
     None(Vec<()>),
 }
 
