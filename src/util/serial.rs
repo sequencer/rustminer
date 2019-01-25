@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use bytes::{BytesMut, BufMut};
+use bytes::{Bytes, BytesMut, BufMut};
 use tokio::io;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
@@ -37,30 +37,33 @@ fn _print_hex(data: &[u8]) {
 
 #[derive(Debug)]
 pub struct Codec {
-    workid: u8,
-    works: Vec<Subwork>,
+    subworkid: u8,
+    subworks: Vec<Option<Subwork>>,
 }
 
 impl Default for Codec {
     fn default() -> Self {
         Self {
-            workid: 0,
-            works: vec![Subwork::default(); 256]
+            subworkid: 0,
+            subworks: vec![None; 256],
         }
     }
 }
 
 impl Decoder for Codec {
-    type Item = BytesMut;
+    type Item = (Subwork, Bytes);
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<<Self as Decoder>::Item>, <Self as Decoder>::Error> {
         if let Some(n) = src.iter().position(|b| *b == 0x55) {
             if src.len() >= n + 7 {
                 let item = &src[n..n + 7];
-//                _print_hex(item);
+                _print_hex(item);
                 if crc5usb_check(item) {
-                    return Ok(Some(src.split_to(n + 7).split_off(n)));
+                    let received = src.split_to(n + 7).split_off(n);
+                    let subworkid = received[5];
+                    let nonce = &received[2..6];
+                    return Ok(self.subworks[subworkid as usize].take().map(|sw| (sw, Bytes::from(nonce))));
                 } else {
                     src.split_to(n);
                 }
@@ -76,12 +79,12 @@ impl Encoder for Codec {
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
         dst.extend(b"\x20\x31");
-        dst.put_u8(self.workid);
+        dst.put_u8(self.subworkid);
         dst.extend(&item.data2);
         dst.extend(&item.midstate);
         dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
-        self.works[self.workid as usize] = item;
-        self.workid = self.workid.wrapping_add(1);
+        self.subworks[self.subworkid as usize] = Some(item);
+        self.subworkid = self.subworkid.wrapping_add(1);
         // debug
         print!("subwork: ");
         _print_hex(dst.as_ref());
@@ -116,7 +119,7 @@ fn serial_receive() {
     let (_, reader) = serial_framed(PORT).split();
     let printer = reader
         .for_each(|s| {
-            println!("received {} bytes: {:?}", s.len(), s);
+            println!("received: {:?}", s);
             Ok(())
         }).map_err(|e| eprintln!("{}", e));
 

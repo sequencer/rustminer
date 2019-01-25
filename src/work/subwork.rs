@@ -9,7 +9,7 @@ pub struct Subwork {
     pub midstate: Bytes,
     pub data2: Bytes,
     pub block_header: Bytes,
-    pub nonce: Option<Bytes>,
+    pub xnonce2: Bytes,
 }
 
 #[allow(dead_code)]
@@ -18,16 +18,12 @@ impl Subwork {
         unimplemented!();
     }
 
-    pub fn diff(&self) -> BigUint {
+    pub fn diff(&self, nonce: &Bytes) -> BigUint {
         static NUM: [u32; 7] = [0xffff_ffff; 7];
         let mut temp = Bytes::new();
         temp.extend(&self.block_header);
-        temp.extend(self.nonce.as_ref().unwrap());
+        temp.extend(nonce);
         BigUint::from_slice(&NUM) / BigUint::from_bytes_be(flip32(temp).as_ref())
-    }
-
-    pub fn recv_nonce(&mut self, nonce: Bytes) {
-        self.nonce = Some(nonce);
     }
 }
 
@@ -55,12 +51,11 @@ impl SubworkMaker {
         }
         let size_diff = self.xnonce2_size - self.counter.bits();
 
-        let mut xnonce = Bytes::with_capacity(16);
-        xnonce.extend(&self.xnonce1);
-        xnonce.extend(vec![0u8; size_diff]);
-        xnonce.extend(self.counter.to_bytes_be());
+        let mut xnonce2 = Bytes::with_capacity(16 - self.xnonce2_size);
+        xnonce2.extend(vec![0u8; size_diff]);
+        xnonce2.extend(self.counter.to_bytes_be());
         self.counter += 1u32;
-        Some(self.work.subwork(&xnonce))
+        Some(self.work.subwork((&self.xnonce1,xnonce2)))
     }
 }
 

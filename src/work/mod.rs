@@ -31,10 +31,11 @@ pub struct Work {
 }
 
 impl Work {
-    fn merkle_root(&self, xnonce: &Bytes) -> Bytes {
+    fn merkle_root(&self, xnonce: &(&Bytes,Bytes)) -> Bytes {
         let mut coinbase = Bytes::with_capacity(250);
         coinbase.extend(&self.coinbase1);
-        coinbase.extend(xnonce);
+        coinbase.extend(xnonce.0);
+        coinbase.extend(&xnonce.1);
         coinbase.extend(&self.coinbase2);
         let mut root = sha256d(&coinbase);
         for node in &self.merkle_branch {
@@ -44,7 +45,7 @@ impl Work {
         flip32(root)
     }
 
-    pub fn block_header(&self, xnonce: &Bytes) -> Bytes {
+    pub fn block_header(&self, xnonce: &(&Bytes,Bytes)) -> Bytes {
         let mut ret = Bytes::with_capacity(76);
         ret.extend(&self.version.to_be_bytes());
         ret.extend(&self.prevhash);
@@ -54,13 +55,13 @@ impl Work {
         ret
     }
 
-    pub fn subwork(&self, xnonce: &Bytes) -> Subwork {
-        let block_header = self.block_header(xnonce);
+    pub fn subwork(&self, xnonce: (&Bytes,Bytes)) -> Subwork {
+        let block_header = self.block_header(&xnonce);
         Subwork {
             midstate: sha256_midstate(&block_header[..64]),
             data2: Bytes::from(&block_header[64..]),
             block_header,
-            nonce: None,
+            xnonce2: xnonce.1,
         }
     }
 }
@@ -75,7 +76,7 @@ pub struct Chunk1Itor {
 }
 
 impl Chunk1Itor {
-    pub fn new(work: &Work, xnonce: &Bytes, vermask: u32) -> Self {
+    pub fn new(work: &Work, xnonce: &(&Bytes,Bytes), vermask: u32) -> Self {
         let offset = vermask.trailing_zeros();
         let rsize = vermask.leading_zeros() + offset;
         let mut tail = Bytes::with_capacity(60);

@@ -27,11 +27,11 @@ fn get_subwork() {
     false
 ]"#;
     let work: Work = serde_json::from_str(work).unwrap();
-    let xnonce = Bytes::from("69bf584a12345678".from_hex().unwrap());
+    let xnonce = (&Bytes::from("69bf584a".from_hex().unwrap()), Bytes::from("12345678".from_hex().unwrap()));
     let block_header = Bytes::from("20000000320a79ca2b659f1a8b8119bb547f4ce4f56e0b0b0024c6070000000000000000c7216feff133aab3a5414472e077a3735ca9839c15425536b8ad383bc099f99d5c11ff051731d97c".from_hex().unwrap());
     let midstate = Bytes::from("bf9213db167c49769ebbf9fa75c8fda449dfb01b75ce7a9c850b0d932b028d81".from_hex().unwrap());
 
-    let subwork = work.subwork(&xnonce);
+    let subwork = work.subwork(xnonce.clone());
     assert_eq!(block_header, &subwork.block_header);
     assert_eq!(midstate, &subwork.midstate);
 

@@ -43,8 +43,8 @@ fn main() {
 
     let task = {
         let receive_from_asic = stream
-            .for_each(|s| {
-                println!("received {} bytes: {:?}", s.len(), s);
+            .for_each(|sw| {
+                println!("received: {:?}", sw);
                 Ok(())
             }).map_err(|e| eprintln!("{}", e));
 
