@@ -62,8 +62,22 @@ impl Decoder for Codec {
                 if crc5usb_check(item) {
                     let received = src.split_to(n + 7).split_off(n);
                     let subworkid = received[5];
+
+                    let subwork = self.subworks[subworkid as usize].take();
+                    let mut dst = BytesMut::new();
+
+                    if let Some(sw) = &subwork {
+                        dst.extend(b"\x20\x31");
+                        dst.put_u8(subworkid);
+                        dst.extend(sw.data2.iter().rev());
+                        dst.extend(sw.midstate.iter().rev());
+                        dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
+                        print!("subwork: ");
+                        _print_hex(dst.as_ref());
+                    }
+
                     let nonce = &received[2..6];
-                    return Ok(self.subworks[subworkid as usize].take().map(|sw| (sw, Bytes::from(nonce))));
+                    return Ok(subwork.map(|sw|(sw, Bytes::from(nonce))));
                 } else {
                     src.split_to(n);
                 }
@@ -80,14 +94,14 @@ impl Encoder for Codec {
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
         dst.extend(b"\x20\x31");
         dst.put_u8(self.subworkid);
-        dst.extend(&item.data2);
-        dst.extend(&item.midstate);
+        dst.extend(item.data2.iter().rev());
+        dst.extend(item.midstate.iter().rev());
         dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
         self.subworks[self.subworkid as usize] = Some(item);
         self.subworkid = self.subworkid.wrapping_add(1);
         // debug
-        print!("subwork: ");
-        _print_hex(dst.as_ref());
+//        print!("subwork: ");
+//        _print_hex(dst.as_ref());
         Ok(())
     }
 }

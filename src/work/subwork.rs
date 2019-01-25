@@ -4,11 +4,12 @@ use futures::stream::Stream;
 use futures::{Async, Poll};
 
 use super::super::stratum::Params;
+use super::super::util::hex::ToHex;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
 pub struct Subwork {
-    pub workid: Bytes,
+    pub workid: String,
     pub midstate: Bytes,
     pub data2: Bytes,
     pub block_header: Bytes,
@@ -30,7 +31,13 @@ impl Subwork {
     }
 
     pub fn into_params(self, name: &str, nonce: Bytes) -> Params {
-        Params::Submit([Bytes::from(name), self.workid, self.xnonce2, self.block_header, nonce])
+        Params::Submit([
+            String::from(name),
+            self.workid,
+            format!("{:0>8}",self.xnonce2.to_hex()),
+            self.block_header[68..72].to_hex(),
+            nonce.to_hex()
+        ])
     }
 }
 

@@ -21,6 +21,7 @@ impl Reader {
                 let mut buf = String::new();
                 if bufr.read_line(&mut buf).is_ok() {
                     if let Ok(s) = serde_json::from_str::<Action>(&buf) {
+                        dbg!(&buf);
                         match s.params {
                             Params::Work(w) => {
                                 let mut works = works.lock().unwrap();

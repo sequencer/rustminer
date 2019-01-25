@@ -14,8 +14,7 @@ use futures::{Async, Poll};
 
 use super::work::*;
 
-use self::message::*;
-pub use self::message::Params;
+pub use self::message::*;
 use self::reader::Reader;
 use self::writer::Writer;
 
@@ -66,7 +65,7 @@ impl Stream for WorkStream {
 pub struct Pool {
     addr: String,
     stream: Option<TcpStream>,
-    counter: u32,
+    pub counter: Arc<Mutex<u32>>,
     reader: Option<Reader>,
     writer: Option<Writer>,
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
@@ -79,7 +78,7 @@ impl Pool {
         Self {
             addr: String::from(addr),
             stream: None,
-            counter: 0,
+            counter: Arc::new(Mutex::new(0)),
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
@@ -96,8 +95,9 @@ impl Pool {
     }
 
     fn counter(&mut self) -> Option<u32> {
-        self.counter += 1;
-        Some(self.counter)
+        let mut counter = self.counter.lock().unwrap();
+        *counter += 1;
+        Some(*counter)
     }
 
     pub fn try_connect(&mut self) -> io::Result<&TcpStream> {
@@ -116,12 +116,12 @@ impl Pool {
         }
     }
 
-    pub fn sender(&mut self) -> &Sender<String> {
+    pub fn sender(&mut self) -> Arc<Mutex<Sender<String>>> {
         match self.writer {
-            Some(ref writer) => &writer.sender,
+            Some(ref writer) => writer.sender.clone(),
             None => {
                 Writer::spawn(self);
-                &self.writer.as_ref().unwrap().sender
+                self.writer.as_ref().unwrap().sender.clone()
             }
         }
     }
@@ -139,7 +139,7 @@ impl Pool {
     pub fn try_send<T: serde::Serialize>(&mut self, msg: T) -> Result<()> {
         let mut data = serde_json::to_string(&msg).unwrap();
         data.push('\n');
-        self.sender().send(data).map_err(Error::from)
+        self.sender().lock().unwrap().send(data).map_err(Error::from)
     }
 
     pub fn try_read(&mut self) -> String {
@@ -177,7 +177,7 @@ impl Pool {
     pub fn submit(&mut self, params: Params) -> Result<()> {
         let msg = Action {
             id: self.counter(),
-            method: String::from("mining.authorize"),
+            method: String::from("mining.submit"),
             params
         };
         self.try_send(&msg)

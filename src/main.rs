@@ -17,17 +17,17 @@ use self::util::serial::serial_framed;
 fn main() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
 
-    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
-    let ext_params = serde_json::json!({
-            "version-rolling.mask": "1fffe000",
-            "version-rolling.min-bit-count": 2
-        });
-
-    // mining.configure
-    let ret = pool.configure(exts, ext_params);
-    println!("1,{:?}", ret);
-    let ret = pool.try_read();
-    println!("1.5,{:?}", ret);
+//    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
+//    let ext_params = serde_json::json!({
+//            "version-rolling.mask": "1fffe000",
+//            "version-rolling.min-bit-count": 2
+//        });
+//
+//    // mining.configure
+//    let ret = pool.configure(exts, ext_params);
+//    println!("1,{:?}", ret);
+//    let ret = pool.try_read();
+//    println!("1.5,{:?}", ret);
 
     let ret = pool.subscribe();
     println!("2,{:?}", ret);
@@ -36,6 +36,8 @@ fn main() {
     let ret = pool.authorize("h723n8m.002", "");
     println!("4,{:?}", ret);
 
+    let pool_sender = pool.sender();
+
     let ws = WorkStream(pool.works.clone());
     let xnonce = pool.xnonce.clone();
     let (sink, stream) = serial_framed("/dev/ttyUSB0").split();
@@ -43,8 +45,17 @@ fn main() {
 
     let task = {
         let receive_from_asic = stream
-            .for_each(|sw| {
+            .for_each(move |sw| {
                 println!("received: {:?}", sw);
+                let params = sw.0.into_params("h723n8m.002", sw.1);
+                let msg = Action {
+                    id: Some(4),
+                    method: String::from("mining.submit"),
+                    params
+                };
+                let mut data = msg.to_string().unwrap();
+                data.push('\n');
+                let _ = pool_sender.lock().unwrap().send(data);
                 Ok(())
             }).map_err(|e| eprintln!("{}", e));
 
