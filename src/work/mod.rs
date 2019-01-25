@@ -58,6 +58,7 @@ impl Work {
     pub fn subwork(&self, xnonce: (&Bytes,Bytes)) -> Subwork {
         let block_header = self.block_header(&xnonce);
         Subwork {
+            workid: self.id.clone(),
             midstate: sha256_midstate(&block_header[..64]),
             data2: Bytes::from(&block_header[64..]),
             block_header,

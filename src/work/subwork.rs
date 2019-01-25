@@ -6,6 +6,7 @@ use futures::{Async, Poll};
 #[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
 pub struct Subwork {
+    pub workid: Bytes,
     pub midstate: Bytes,
     pub data2: Bytes,
     pub block_header: Bytes,
