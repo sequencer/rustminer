@@ -173,4 +173,13 @@ impl Pool {
         };
         self.try_send(&msg)
     }
+
+    pub fn submit(&mut self, params: Params) -> Result<()> {
+        let msg = Action {
+            id: self.counter(),
+            method: String::from("mining.authorize"),
+            params
+        };
+        self.try_send(&msg)
+    }
 }
