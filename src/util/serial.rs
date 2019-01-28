@@ -4,13 +4,13 @@ use bytes::{Bytes, BytesMut, BufMut};
 use tokio::io;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
-use crc::Crc;
+use crc::CrcAlgo;
 use lazy_static::lazy_static;
 
 use super::super::work::Subwork;
 
 fn crc5usb(data: &[u8]) -> u8 {
-    lazy_static!(static ref CRC5_USB: Crc<u8> = Crc::<u8>::new(0x05, 5, 0x1f, 0x1f, true););
+    lazy_static!(static ref CRC5_USB: CrcAlgo<u8> = CrcAlgo::<u8>::new(0x05, 5, 0x1f, 0x1f, true););
     let crc = &mut 0u8;
     CRC5_USB.init_crc(crc);
     CRC5_USB.update_crc(crc, data)
@@ -21,7 +21,7 @@ fn crc5usb_check(data: &[u8]) -> bool {
 }
 
 fn crc16_ccitt_false(data: &[u8]) -> u16 {
-    lazy_static!(static ref CRC16_CCITT_FALSE: Crc<u16> = Crc::<u16>::new(0x1021, 16, 0xffff, 0, false););
+    lazy_static!(static ref CRC16_CCITT_FALSE: CrcAlgo<u16> = CrcAlgo::<u16>::new(0x1021, 16, 0xffff, 0, false););
     let crc = &mut 0u16;
     CRC16_CCITT_FALSE.init_crc(crc);
     CRC16_CCITT_FALSE.update_crc(crc, data)
