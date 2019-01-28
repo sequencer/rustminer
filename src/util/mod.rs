@@ -1,5 +1,7 @@
+use core::mem::transmute;
+
 use bytes::Bytes;
-use ring::digest;
+use sha256::Sha256;
 
 pub mod hex;
 pub mod serial;
@@ -7,8 +9,16 @@ pub mod serial;
 pub use self::hex::FromHex;
 
 pub fn sha256d(data: &Bytes) -> Bytes {
-    let mut data = digest::digest(&digest::SHA256, data);
-    data = digest::digest(&digest::SHA256, data.as_ref());
+    let mut sha256 = Sha256::new();
+    sha256.update(data);
+
+    let mut data = sha256.finish();
+
+    let mut sha256 = Sha256::new();
+    sha256.update(&data);
+
+    data = sha256.finish();
+
     Bytes::from(data.as_ref())
 }
 
@@ -23,31 +33,12 @@ pub fn flip32(data: Bytes) -> Bytes {
 }
 
 pub fn sha256_midstate(data: &[u8]) -> Bytes {
-    use std::mem::transmute;
+    let mut sha256 = Sha256::new();
 
-    #[allow(dead_code)]
-    struct Context {
-        state: [u64; digest::MAX_CHAINING_LEN / 8],
-        completed_data_blocks: u64,
-        pending: [u8; digest::MAX_BLOCK_LEN],
-        num_pending: usize,
-        pub algorithm: &'static digest::Algorithm,
-    }
-
-    let mut ctx = digest::Context::new(&digest::SHA256);
     let data = Bytes::from(data);
-    ctx.update(flip32(data).as_ref());
+    sha256.update(flip32(data).as_ref());
 
-    let mut state = [0u32; 8];
-    state.copy_from_slice(unsafe {
-        &transmute::<_, [u32; 16]>(transmute::<_, Context>(ctx).state)[..8]
-    });
-
-    let mut ret = Bytes::with_capacity(32);
-    for i in state.iter() {
-        ret.extend(&i.to_le_bytes());
-    }
-    ret
+    Bytes::from(unsafe { transmute::<_, [u8; 32]>(sha256.state()).as_ref() })
 }
 
 pub mod hex_to {
