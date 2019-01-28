@@ -1,8 +1,9 @@
-use ring::digest;
 use bytes::Bytes;
+use ring::digest;
 
 pub mod hex;
 pub mod serial;
+
 pub use self::hex::FromHex;
 
 pub fn sha256d(data: &Bytes) -> Bytes {
@@ -38,9 +39,9 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
     ctx.update(flip32(data).as_ref());
 
     let mut state = [0u32; 8];
-    state.copy_from_slice(
-        unsafe { &transmute::<_, [u32; 16]>(transmute::<_, Context>(ctx).state)[..8] }
-    );
+    state.copy_from_slice(unsafe {
+        &transmute::<_, [u32; 16]>(transmute::<_, Context>(ctx).state)[..8]
+    });
 
     let mut ret = Bytes::with_capacity(32);
     for i in state.iter() {
@@ -51,7 +52,7 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
 
 pub mod hex_to {
     use super::*;
-    use serde::{de, Deserializer, Deserialize};
+    use serde::{de, Deserialize, Deserializer};
 
     pub fn bytes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
         let s: &str = Deserialize::deserialize(deserializer)?;

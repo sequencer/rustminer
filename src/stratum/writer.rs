@@ -1,9 +1,10 @@
 use std::boxed::FnBox;
 use std::io::{LineWriter, Write};
 
+use failure::ResultExt;
+
 use super::*;
 
-#[allow(dead_code)]
 pub struct Writer {
     pub sender: Arc<Mutex<Sender<String>>>,
     handle: JoinHandle<()>,
@@ -20,14 +21,16 @@ impl Writer {
             let mut data = String::new();
             loop {
                 let _ = result_tx.send(
-                    Box::new(
-                        |rx: &Receiver<String>| -> Result<usize> {
-                            data = rx.recv().context("Writer recv err!")?;
-                            dbg!(&data);
-                            Ok(linew.write(data.as_bytes()).context("TcpSteam write err!")?)
-                        }).call_box((&data_rx, ))
+                    Box::new(|rx: &Receiver<String>| -> Result<usize> {
+                        data = rx.recv().context("Writer recv err!")?;
+                        dbg!(&data);
+                        Ok(linew
+                            .write(data.as_bytes())
+                            .context("TcpSteam write err!")?)
+                    })
+                    .call_box((&data_rx,)),
                 );
-            };
+            }
         });
         pool.writer = Some(Self {
             sender: Arc::new(Mutex::new(data_tx)),

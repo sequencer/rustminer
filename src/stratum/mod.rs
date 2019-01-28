@@ -1,30 +1,29 @@
+use std::collections::VecDeque;
 use std::io;
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread::{self, JoinHandle};
-use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
 
 use bytes::Bytes;
-pub use failure::{Error, ResultExt};
+use failure::Error;
 use futures::stream::Stream;
 use futures::task::Task;
 use futures::{Async, Poll};
 
-use super::work::*;
+mod message;
+mod reader;
+#[cfg(test)]
+mod tests;
+mod writer;
 
 pub use self::message::*;
 use self::reader::Reader;
 use self::writer::Writer;
+use super::work::*;
 
 pub type Result<T> = std::result::Result<T, failure::Error>;
-
-mod message;
-mod writer;
-mod reader;
-#[cfg(test)]
-mod tests;
 
 #[derive(Debug, Default)]
 pub struct WorkDeque(VecDeque<Work>);
@@ -102,13 +101,17 @@ impl Pool {
 
     pub fn try_connect(&mut self) -> io::Result<&TcpStream> {
         match self.stream {
-            Some(ref s) if match s.take_error() {
-                Ok(None) => true,
-                Ok(Some(e)) | Err(e) => {
-                    println!("{:?}", e);
-                    false
-                }
-            } => Ok(s),
+            Some(ref s)
+                if match s.take_error() {
+                    Ok(None) => true,
+                    Ok(Some(e)) | Err(e) => {
+                        println!("{:?}", e);
+                        false
+                    }
+                } =>
+            {
+                Ok(s)
+            }
             _ => {
                 self.stream = Some(TcpStream::connect(&self.addr)?);
                 Ok(self.stream.as_ref().unwrap())
@@ -139,7 +142,11 @@ impl Pool {
     pub fn try_send<T: serde::Serialize>(&mut self, msg: T) -> Result<()> {
         let mut data = serde_json::to_string(&msg).unwrap();
         data.push('\n');
-        self.sender().lock().unwrap().send(data).map_err(Error::from)
+        self.sender()
+            .lock()
+            .unwrap()
+            .send(data)
+            .map_err(Error::from)
     }
 
     pub fn try_read(&mut self) -> String {
@@ -178,7 +185,7 @@ impl Pool {
         let msg = Action {
             id: self.counter(),
             method: String::from("mining.submit"),
-            params
+            params,
         };
         self.try_send(&msg)
     }

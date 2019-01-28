@@ -1,15 +1,14 @@
 use bytes::Bytes;
 use num_bigint::BigUint;
-use serde::{Serialize, Deserialize};
-
-use super::util::*;
-pub use self::subwork::*;
+use serde::{Deserialize, Serialize};
 
 mod subwork;
 #[cfg(test)]
 mod tests;
 
-#[allow(dead_code)]
+pub use self::subwork::*;
+use super::util::*;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Work {
     id: String,
@@ -31,7 +30,7 @@ pub struct Work {
 }
 
 impl Work {
-    fn merkle_root(&self, xnonce: &(&Bytes,Bytes)) -> Bytes {
+    fn merkle_root(&self, xnonce: &(&Bytes, Bytes)) -> Bytes {
         let mut coinbase = Bytes::with_capacity(250);
         coinbase.extend(&self.coinbase1);
         coinbase.extend(xnonce.0);
@@ -45,7 +44,7 @@ impl Work {
         flip32(root)
     }
 
-    pub fn block_header(&self, xnonce: &(&Bytes,Bytes)) -> Bytes {
+    pub fn block_header(&self, xnonce: &(&Bytes, Bytes)) -> Bytes {
         let mut ret = Bytes::with_capacity(76);
         ret.extend(&self.version.to_be_bytes());
         ret.extend(&self.prevhash);
@@ -55,7 +54,7 @@ impl Work {
         ret
     }
 
-    pub fn subwork(&self, xnonce: (&Bytes,Bytes)) -> Subwork {
+    pub fn subwork(&self, xnonce: (&Bytes, Bytes)) -> Subwork {
         let block_header = self.block_header(&xnonce);
         Subwork {
             workid: self.id.clone(),
@@ -77,7 +76,7 @@ pub struct Chunk1Itor {
 }
 
 impl Chunk1Itor {
-    pub fn new(work: &Work, xnonce: &(&Bytes,Bytes), vermask: u32) -> Self {
+    pub fn new(work: &Work, xnonce: &(&Bytes, Bytes), vermask: u32) -> Self {
         let offset = vermask.trailing_zeros();
         let rsize = vermask.leading_zeros() + offset;
         let mut tail = Bytes::with_capacity(60);

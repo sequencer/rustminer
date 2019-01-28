@@ -6,11 +6,14 @@ use super::*;
 fn connect_to_tcp() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
 
-    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
+    let exts = vec![
+        "minimum-difficulty".to_string(),
+        "version-rolling".to_string(),
+    ];
     let ext_params = json!({
-            "version-rolling.mask": "1fffe000",
-            "version-rolling.min-bit-count": 2
-        });
+        "version-rolling.mask": "1fffe000",
+        "version-rolling.min-bit-count": 2
+    });
 
     // mining.configure
     let ret = pool.configure(exts, ext_params);
@@ -35,13 +38,18 @@ fn serialize_json_data() {
         method: String::from("mining.subscribe"),
         params: Params::None(vec![]),
     };
-    assert_eq!(r#"{"id":1,"method":"mining.subscribe","params":[]}"#, &msg.to_string().unwrap());
+    assert_eq!(
+        r#"{"id":1,"method":"mining.subscribe","params":[]}"#,
+        &msg.to_string().unwrap()
+    );
 
     let msg = Action {
         id: Some(3),
         method: String::from("mining.authorize"),
         params: Params::User([String::from("user1"), String::from("password")]),
     };
-    assert_eq!(r#"{"id":3,"method":"mining.authorize","params":["user1","password"]}"#,
-               &msg.to_string().unwrap());
+    assert_eq!(
+        r#"{"id":3,"method":"mining.authorize","params":["user1","password"]}"#,
+        &msg.to_string().unwrap()
+    );
 }

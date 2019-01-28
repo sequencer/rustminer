@@ -1,7 +1,8 @@
-use super::*;
-use super::super::util::hex_to;
-use serde::{Deserialize, Serialize};
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+
+use super::super::util::hex_to;
+use super::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Action {
@@ -32,16 +33,10 @@ pub enum Params {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct TMask(
-    #[serde(deserialize_with = "hex_to::bytes_vec")]
-    Vec<Bytes>
-);
+pub struct TMask(#[serde(deserialize_with = "hex_to::bytes_vec")] Vec<Bytes>);
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Config(
-    pub Vec<String>,
-    pub serde_json::Value,
-);
+pub struct Config(pub Vec<String>, pub serde_json::Value);
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -53,18 +48,13 @@ pub enum ResultOf {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultOfSubscribe(
-    pub [StringWithBytes; 2],   // set_difficulty & notify
-    #[serde(deserialize_with = "hex_to::bytes")]
-    pub Bytes,                  // xnonce1
-    pub usize,                  // xnonce2_size
+    pub [StringWithBytes; 2], // set_difficulty & notify
+    #[serde(deserialize_with = "hex_to::bytes")] pub Bytes, // xnonce1
+    pub usize,                // xnonce2_size
 );
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct StringWithBytes(
-    String,
-    #[serde(deserialize_with = "hex_to::bytes")]
-    Bytes,
-);
+pub struct StringWithBytes(String, #[serde(deserialize_with = "hex_to::bytes")] Bytes);
 
 pub trait ToJsonString: serde::Serialize {
     fn to_string(&self) -> serde_json::Result<String> {

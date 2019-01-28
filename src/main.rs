@@ -6,13 +6,13 @@ use std::time::{Duration, Instant};
 use tokio::prelude::*;
 use tokio::timer::Delay;
 
+pub mod stratum;
 mod util;
 pub mod work;
-pub mod stratum;
 
-use self::work::*;
 use self::stratum::*;
 use self::util::serial::serial_framed;
+use self::work::*;
 
 fn main() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
@@ -51,13 +51,14 @@ fn main() {
                 let msg = Action {
                     id: Some(4),
                     method: String::from("mining.submit"),
-                    params
+                    params,
                 };
                 let mut data = msg.to_string().unwrap();
                 data.push('\n');
                 let _ = pool_sender.lock().unwrap().send(data);
                 Ok(())
-            }).map_err(|e| eprintln!("{}", e));
+            })
+            .map_err(|e| eprintln!("{}", e));
 
         let send_to_asic = ws
             .for_each(move |w| {
