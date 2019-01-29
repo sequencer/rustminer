@@ -9,12 +9,12 @@ pub mod serial;
 pub use self::hex::FromHex;
 
 pub fn sha256d(data: &Bytes) -> Bytes {
-    let mut sha256 = Sha256::new();
+    let mut sha256 = Sha256::default();
     sha256.update(data);
 
     let mut data = sha256.finish();
 
-    let mut sha256 = Sha256::new();
+    let mut sha256 = Sha256::default();
     sha256.update(&data);
 
     data = sha256.finish();
@@ -33,7 +33,7 @@ pub fn flip32(data: Bytes) -> Bytes {
 }
 
 pub fn sha256_midstate(data: &[u8]) -> Bytes {
-    let mut sha256 = Sha256::new();
+    let mut sha256 = Sha256::default();
 
     let data = Bytes::from(data);
     sha256.update(flip32(data).as_ref());
