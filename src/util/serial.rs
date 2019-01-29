@@ -7,6 +7,8 @@ use tokio::io;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
 
+#[allow(unused_imports)]
+use super::super::util::print_hex;
 use super::super::work::Subwork;
 
 fn crc5_usb(data: &[u8]) -> u8 {
@@ -30,14 +32,6 @@ fn crc16_ccitt_false(data: &[u8]) -> u16 {
     let crc = &mut 0u16;
     CRC16_CCITT_FALSE.init_crc(crc);
     CRC16_CCITT_FALSE.update_crc(crc, data)
-}
-
-fn _print_hex(data: &[u8]) {
-    print!("0x");
-    for b in data {
-        print!("{:02x}", b);
-    }
-    println!();
 }
 
 #[derive(Debug)]
@@ -66,25 +60,24 @@ impl Decoder for Codec {
         if let Some(n) = src.iter().position(|b| *b == 0x55) {
             if src.len() >= n + 7 {
                 let item = &src[n..n + 7];
-                _print_hex(item);
                 if crc5_usb_check(item) {
                     let received = src.split_to(n + 7).split_off(n);
                     let subworkid = received[5];
-
                     let subwork = self.subworks[subworkid as usize].take();
-                    let mut dst = BytesMut::new();
+                    let nonce = &received[2..6];
 
+                    // debug
+                    let mut dst = BytesMut::new();
                     if let Some(sw) = &subwork {
                         dst.extend(b"\x20\x31");
                         dst.put_u8(subworkid);
                         dst.extend(sw.data2.iter().rev());
                         dst.extend(sw.midstate.iter().rev());
                         dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
-                        print!("subwork: ");
-                        _print_hex(dst.as_ref());
+                        print!("received subwork: ");
+                        print_hex(&dst);
                     }
 
-                    let nonce = &received[2..6];
                     return Ok(subwork.map(|sw| (sw, Bytes::from(nonce))));
                 } else {
                     src.split_to(n);
@@ -100,6 +93,7 @@ impl Encoder for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        dst.reserve(49);
         dst.extend(b"\x20\x31");
         dst.put_u8(self.subworkid);
         dst.extend(item.data2.iter().rev());
@@ -108,8 +102,8 @@ impl Encoder for Codec {
         self.subworks[self.subworkid as usize] = Some(item);
         self.subworkid = self.subworkid.wrapping_add(1);
         // debug
-        print!("subwork: ");
-        _print_hex(dst.as_ref());
+        print!("sending subwork: ");
+        print_hex(dst);
         Ok(())
     }
 }

@@ -6,7 +6,7 @@ use sha256::Sha256;
 pub mod hex;
 pub mod serial;
 
-pub use self::hex::FromHex;
+pub use self::hex::{FromHex, ToHex};
 
 pub fn sha256d(data: &Bytes) -> Bytes {
     let mut sha256 = Sha256::default();
@@ -39,6 +39,12 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
     sha256.update(flip32(data).as_ref());
 
     Bytes::from(unsafe { transmute::<_, [u8; 32]>(sha256.state()).as_ref() })
+}
+
+#[allow(dead_code)]
+pub fn print_hex(data: &[u8]) {
+    print!("0x");
+    println!("{}", data.to_hex());
 }
 
 pub mod hex_to {
