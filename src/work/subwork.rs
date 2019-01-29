@@ -53,15 +53,19 @@ impl SubworkMaker {
     }
 
     fn next(&mut self) -> Option<Subwork> {
-        if self.xnonce2_size < self.counter.bits() {
+        if self.xnonce2_size * 8 < self.counter.bits() {
             return None;
         }
-        let size_diff = self.xnonce2_size - self.counter.bits();
 
-        let mut xnonce2 = Bytes::with_capacity(16 - self.xnonce2_size);
+        let xnonce2_tail = self.counter.to_bytes_be();
+        let size_diff = self.xnonce2_size - xnonce2_tail.len();
+
+        let mut xnonce2 = Bytes::with_capacity(self.xnonce2_size);
         xnonce2.extend(vec![0u8; size_diff]);
-        xnonce2.extend(self.counter.to_bytes_be());
-        self.counter += 1u32;
+        xnonce2.extend(xnonce2_tail);
+
+        self.counter += 1u8;
+
         Some(self.work.subwork((&self.xnonce1, xnonce2)))
     }
 }
