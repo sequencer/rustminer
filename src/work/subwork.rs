@@ -20,7 +20,7 @@ impl Subwork {
         let mut temp = Bytes::new();
         temp.extend(&self.block_header);
         temp.extend(nonce);
-        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(flip32(temp).as_ref())
+        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(temp.flip32().as_ref())
     }
 
     pub fn into_params(self, name: &str, nonce: Bytes) -> Params {

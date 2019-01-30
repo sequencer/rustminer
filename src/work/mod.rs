@@ -36,12 +36,12 @@ impl Work {
         coinbase.extend(xnonce.0);
         coinbase.extend(&xnonce.1);
         coinbase.extend(&self.coinbase2);
-        let mut root = sha256d(&coinbase);
+        let mut root = coinbase.sha256d();
         for node in &self.merkle_branch {
             root.extend(node);
-            root = sha256d(&root);
+            root = root.sha256d();
         }
-        flip32(root)
+        root.flip32()
     }
 
     pub fn block_header(&self, xnonce: &(&Bytes, Bytes)) -> Bytes {
