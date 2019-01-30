@@ -14,6 +14,7 @@ impl Reader {
         let xnonce = pool.xnonce.clone();
         let works = pool.works.clone();
         let vermask = pool.vermask.clone();
+        let diff = pool.diff.clone();
         let mut bufr = BufReader::new(stream);
         let (data_tx, data_rx) = mpsc::channel();
         let handle = thread::spawn(move || loop {
@@ -33,6 +34,13 @@ impl Reader {
                                 None => (),
                             }
                             println!("received new work!");
+                        }
+                        Params::Integer([n]) => {
+                            if s.method.as_str() == "mining.set_difficulty" {
+                                let mut diff = diff.lock().unwrap();
+                                *diff = BigUint::from(n);
+                                println!("set difficulty: {}!", n);
+                            }
                         }
                         _ => println!("=> {}: {:?}", s.method, s.params),
                     }

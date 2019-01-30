@@ -11,6 +11,7 @@ use failure::Error;
 use futures::stream::Stream;
 use futures::task::Task;
 use futures::{Async, Poll};
+use num_bigint::BigUint;
 
 mod message;
 mod reader;
@@ -70,6 +71,7 @@ pub struct Pool {
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub works: Arc<Mutex<(WorkDeque, Option<Task>)>>,
     pub vermask: Arc<Mutex<Option<Bytes>>>,
+    pub diff: Arc<Mutex<BigUint>>,
 }
 
 impl Pool {
@@ -83,6 +85,7 @@ impl Pool {
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             works: Arc::new(Mutex::new((WorkDeque::default(), None))),
             vermask: Arc::new(Mutex::new(None)),
+            diff: Arc::new(Mutex::new(BigUint::default())),
         }
     }
 
