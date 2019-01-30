@@ -16,14 +16,23 @@ pub struct Subwork {
 }
 
 impl Subwork {
-    pub fn diff(&self, nonce: &Bytes) -> BigUint {
+    pub fn target(&self, nonce: &Bytes) -> Bytes {
+        let mut target = BytesMut::new();
+        target.extend(&self.block_header);
+        target.extend(nonce);
+        target = target.flip32().sha256d();
+        target.reverse();
+        target.freeze()
+    }
+
+    pub fn target_diff(target: &Bytes) -> BigUint {
         static NUM: [u32; 7] = [0xffff_ffff; 7];
-        let mut temp = BytesMut::new();
-        temp.extend(&self.block_header);
-        temp.extend(nonce);
-        temp = temp.flip32().sha256d();
-        temp.reverse();
-        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(&temp)
+        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(target)
+    }
+
+    pub fn diff(&self, nonce: &Bytes) -> BigUint {
+        let target = self.target(nonce);
+        Self::target_diff(&target)
     }
 
     pub fn into_params(self, name: &str, nonce: Bytes) -> Params {
