@@ -1,3 +1,4 @@
+use bytes::BytesMut;
 use futures::stream::Stream;
 use futures::{Async, Poll};
 
@@ -17,10 +18,12 @@ pub struct Subwork {
 impl Subwork {
     pub fn diff(&self, nonce: &Bytes) -> BigUint {
         static NUM: [u32; 7] = [0xffff_ffff; 7];
-        let mut temp = Bytes::new();
+        let mut temp = BytesMut::new();
         temp.extend(&self.block_header);
         temp.extend(nonce);
-        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(temp.flip32().as_ref())
+        temp = temp.flip32().sha256d();
+        temp.reverse();
+        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(&temp)
     }
 
     pub fn into_params(self, name: &str, nonce: Bytes) -> Params {
