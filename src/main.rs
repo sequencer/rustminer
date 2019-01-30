@@ -40,7 +40,7 @@ fn main() {
 
     let ws = WorkStream(pool.works.clone());
     let xnonce = pool.xnonce.clone();
-    let (sink, stream) = serial_framed("/dev/ttyUSB0").split();
+    let (sink, stream) = serial_framed("/dev/ttyS1").split();
     let sink = Arc::new(Mutex::new(sink));
 
     let task = {
@@ -62,7 +62,7 @@ fn main() {
                     let _ = pool_sender.lock().unwrap().send(data);
                 } else {
                     eprintln!(
-                        "nonce difficulty: {} is too low, required {}!",
+                        "nonce difficulty {} is too low, require {}!",
                         diff, *pool_diff
                     );
                 }
@@ -80,7 +80,7 @@ fn main() {
                     .for_each(move |sw| {
                         let sink = sink.clone();
                         // delay_send
-                        Delay::new(Instant::now() + Duration::from_millis(100))
+                        Delay::new(Instant::now() + Duration::from_millis(1))
                             .and_then(move |_| {
                                 let mut sink = sink.lock().unwrap();
                                 sink.start_send(sw).unwrap();
