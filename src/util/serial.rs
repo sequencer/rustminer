@@ -1,3 +1,4 @@
+use std::iter::FromIterator;
 use std::path::Path;
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -64,7 +65,7 @@ impl Decoder for Codec {
                     let received = src.split_to(n + 7).split_off(n);
                     let subworkid = received[5];
                     let subwork = self.subworks[subworkid as usize].take();
-                    let nonce = &received[2..6];
+                    let nonce = Bytes::from_iter(received[1..5].iter().rev().map(|b| *b));
 
                     // debug
                     let mut dst = BytesMut::new();
@@ -78,7 +79,7 @@ impl Decoder for Codec {
                         print_hex(&dst);
                     }
 
-                    return Ok(subwork.map(|sw| (sw, Bytes::from(nonce))));
+                    return Ok(subwork.map(|sw| (sw, nonce)));
                 } else {
                     src.split_to(n);
                 }
