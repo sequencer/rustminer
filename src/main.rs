@@ -44,18 +44,28 @@ fn main() {
     let sink = Arc::new(Mutex::new(sink));
 
     let task = {
+        let pool_diff = pool.diff.clone();
         let receive_from_asic = stream
             .for_each(move |sw| {
                 println!("received: {:?}", sw);
-                let params = sw.0.into_params("h723n8m.002", sw.1);
-                let msg = Action {
-                    id: Some(4),
-                    method: String::from("mining.submit"),
-                    params,
-                };
-                let mut data = msg.to_string().unwrap();
-                data.push('\n');
-                let _ = pool_sender.lock().unwrap().send(data);
+                let diff = sw.0.diff(&sw.1);
+                let pool_diff = pool_diff.lock().unwrap();
+                if diff >= *pool_diff {
+                    let params = sw.0.into_params("h723n8m.002", sw.1);
+                    let msg = Action {
+                        id: Some(4),
+                        method: String::from("mining.submit"),
+                        params,
+                    };
+                    let mut data = msg.to_string().unwrap();
+                    data.push('\n');
+                    let _ = pool_sender.lock().unwrap().send(data);
+                } else {
+                    eprintln!(
+                        "nonce difficulty: {} is too low, required {}!",
+                        diff, *pool_diff
+                    );
+                }
                 Ok(())
             })
             .map_err(|e| eprintln!("{}", e));
