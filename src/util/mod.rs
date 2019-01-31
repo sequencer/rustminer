@@ -31,18 +31,8 @@ impl Flip32 for BytesMut {
 }
 
 pub trait Sha256d: Sized + AsRef<[u8]> + for<'a> From<&'a [u8]> {
-    fn sha256d(self) -> Self {
-        let mut sha256 = Sha256::default();
-        sha256.update(self.as_ref());
-
-        let mut data = sha256.finish();
-
-        let mut sha256 = Sha256::default();
-        sha256.update(&data);
-
-        data = sha256.finish();
-
-        Self::from(data.as_ref())
+    fn sha256d(&self) -> Self {
+        Self::from(Sha256::digest(&Sha256::digest(self.as_ref())).as_ref())
     }
 }
 
