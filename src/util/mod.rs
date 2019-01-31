@@ -1,4 +1,4 @@
-use core::mem::transmute;
+use std::iter::FromIterator;
 
 use bytes::{Bytes, BytesMut};
 use sha256::Sha256;
@@ -46,7 +46,7 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
     let data = Bytes::from(data);
     sha256.update(data.flip32().as_ref());
 
-    Bytes::from(unsafe { transmute::<_, [u8; 32]>(sha256.state()).as_ref() })
+    Bytes::from_iter(sha256.state().iter().flat_map(|x| x.to_le_bytes().to_vec()))
 }
 
 #[allow(dead_code)]
