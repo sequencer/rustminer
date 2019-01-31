@@ -42,9 +42,7 @@ impl Sha256d for BytesMut {}
 
 pub fn sha256_midstate(data: &[u8]) -> Bytes {
     let mut sha256 = Sha256::default();
-
-    let data = Bytes::from(data);
-    sha256.update(data.flip32().as_ref());
+    sha256.update(Bytes::from(data).flip32().as_ref());
 
     Bytes::from_iter(sha256.state().iter().flat_map(|x| x.to_le_bytes().to_vec()))
 }

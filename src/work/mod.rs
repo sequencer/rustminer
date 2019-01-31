@@ -45,13 +45,13 @@ impl Work {
     }
 
     pub fn block_header(&self, xnonce: &(&Bytes, Bytes)) -> Bytes {
-        let mut ret = Bytes::with_capacity(76);
-        ret.extend(&self.version.to_be_bytes());
-        ret.extend(&self.prevhash);
-        ret.extend(&self.merkle_root(xnonce));
-        ret.extend(&self.ntime);
-        ret.extend(&self.nbits);
-        ret
+        let mut header = Bytes::with_capacity(76);
+        header.extend(&self.version.to_be_bytes());
+        header.extend(&self.prevhash);
+        header.extend(&self.merkle_root(xnonce));
+        header.extend(&self.ntime);
+        header.extend(&self.nbits);
+        header
     }
 
     pub fn subwork(&self, xnonce: (&Bytes, Bytes)) -> Subwork {

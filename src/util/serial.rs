@@ -71,26 +71,23 @@ impl Decoder for Codec {
                 if crc5_usb_check(item) {
                     self.received = src.split_to(n + 7).split_off(n);
                     let id = self.received[5] as usize;
-                    let nonce = Bytes::from_iter(self.received[1..5].iter().rev().map(|b| *b));
+                    let nonce = Bytes::from_iter(self.received[1..5].iter().rev().cloned());
 
                     let mut subworkid;
                     let mut subwork = None;
                     for i in 0..0x3fusize {
                         subworkid = i << 8 | id;
-                        match &self.subworks[subworkid] {
-                            Some(ref sw) => {
-                                let target = sw.target(&nonce);
+                        if let Some(ref sw) = &self.subworks[subworkid] {
+                            let target = sw.target(&nonce);
 
-                                // debug
-                                print!("check target: ");
-                                print_hex(&target);
+                            // debug
+                            print!("check target: ");
+                            print_hex(&target);
 
-                                if target.starts_with(b"\0\0\0\0") {
-                                    subwork = self.subworks[subworkid].take();
-                                    break;
-                                }
+                            if target.starts_with(b"\0\0\0\0") {
+                                subwork = self.subworks[subworkid].take();
+                                break;
                             }
-                            _ => (),
                         }
                     }
 
