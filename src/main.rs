@@ -1,5 +1,3 @@
-#![feature(fnbox)]
-
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -29,27 +27,27 @@ fn main() {
 //    let ret = pool.try_read();
 //    println!("1.5,{:?}", ret);
 
-    let ret = pool.subscribe();
-    println!("2,{:?}", ret);
-    let ret = pool.try_read();
-    println!("3,{}", ret);
-    let ret = pool.authorize("h723n8m.002", "");
-    println!("4,{:?}", ret);
+    let connect_pool = pool.connect();
+    let reader = Reader::create(&mut pool);
+
+    pool.subscribe();
+    pool.authorize("h723n8m.002", "");
 
     let pool_sender = pool.sender();
 
     let ws = WorkStream(pool.works.clone());
     let xnonce = pool.xnonce.clone();
-    let (sink, stream) = serial_framed("/dev/ttyS1").split();
+    let (sink, stream) = serial_framed("/dev/ttyUSB0").split();
     let sink = Arc::new(Mutex::new(sink));
 
-    let task = {
+    let connect_serial = {
         let pool_diff = pool.diff.clone();
         let receive_from_asic = stream
             .for_each(move |sw| {
                 println!("received: {:?}", sw);
                 let diff = sw.0.diff(&sw.1);
                 let pool_diff = pool_diff.lock().unwrap();
+                let pool_sender = pool_sender.clone();
                 if diff >= *pool_diff {
                     let params = sw.0.into_params("h723n8m.002", sw.1);
                     let msg = Action {
@@ -59,7 +57,7 @@ fn main() {
                     };
                     let mut data = msg.to_string().unwrap();
                     data.push('\n');
-                    let _ = pool_sender.lock().unwrap().send(data);
+                    tokio::spawn(pool_sender.send(data).and_then(|_| Ok(())).map_err(|_| ()));
                 } else {
                     eprintln!(
                         "nonce difficulty {} is too low, require {}!",
@@ -96,5 +94,6 @@ fn main() {
         receive_from_asic.join(send_to_asic).then(|_| Ok(()))
     };
 
+    let task = connect_pool.join3(reader, connect_serial).then(|_| Ok(()));
     tokio::run(task);
 }

@@ -1,27 +1,17 @@
-use std::io::{BufRead, BufReader};
-
 use super::super::util::hex_to;
 use super::*;
 
-pub struct Reader {
-    pub receiver: Receiver<String>,
-    handle: JoinHandle<()>,
-}
+pub struct Reader;
 
 impl Reader {
-    pub fn spawn(pool: &mut Pool) {
-        let stream = pool.try_connect().unwrap().try_clone().unwrap();
+    pub fn create(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send + 'static {
         let xnonce = pool.xnonce.clone();
         let works = pool.works.clone();
         let vermask = pool.vermask.clone();
         let diff = pool.diff.clone();
-        let mut bufr = BufReader::new(stream);
-        let (data_tx, data_rx) = mpsc::channel();
-        let handle = thread::spawn(move || loop {
-            let mut buf = String::new();
-            if bufr.read_line(&mut buf).is_ok() {
-                if let Ok(s) = serde_json::from_str::<Action>(&buf) {
-                    dbg!(&buf);
+        pool.receiver()
+            .for_each(move |line| {
+                if let Ok(s) = serde_json::from_str::<Action>(&line) {
                     match s.params {
                         Params::Work(w) => {
                             let mut works = works.lock().unwrap();
@@ -44,7 +34,7 @@ impl Reader {
                         }
                         _ => println!("=> {}: {:?}", s.method, s.params),
                     }
-                } else if let Ok(s) = serde_json::from_str::<Respond>(&buf) {
+                } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
                     match s.result {
                         ResultOf::Authorize(r) => {
                             if r {
@@ -82,18 +72,8 @@ impl Reader {
                         }
                     }
                 }
-            }
-            if let Err(e) = data_tx.send(buf) {
-                println!("Reader send err: {:?}!", e);
-            }
-        });
-        pool.reader = Some(Self {
-            receiver: data_rx,
-            handle,
-        });
-    }
-
-    pub fn join(self) -> thread::Result<()> {
-        self.handle.join()
+                Ok(())
+            })
+            .map_err(|_| ())
     }
 }
