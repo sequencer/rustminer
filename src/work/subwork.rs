@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use bytes::BytesMut;
 use futures::stream::Stream;
 use futures::{Async, Poll};
@@ -52,20 +54,25 @@ pub struct SubworkMaker {
     xnonce1: Bytes,
     xnonce2_size: usize,
     counter: BigUint,
+    has_new_work: Arc<Mutex<Option<()>>>,
 }
 
 impl SubworkMaker {
-    pub fn new(work: Work, xnonce: &(Bytes, usize)) -> Self {
+    pub fn new(work: Work, xnonce: &(Bytes, usize), has_new_work: Arc<Mutex<Option<()>>>) -> Self {
+        has_new_work.lock().unwrap().take();
         Self {
             work,
             xnonce1: Bytes::from(xnonce.0.as_ref()),
             xnonce2_size: xnonce.1,
             counter: BigUint::from(0u32),
+            has_new_work,
         }
     }
 
     fn next(&mut self) -> Option<Subwork> {
-        if self.xnonce2_size * 8 < self.counter.bits() {
+        if self.xnonce2_size * 8 < self.counter.bits()
+            || self.has_new_work.lock().unwrap().take().is_some()
+        {
             return None;
         }
 

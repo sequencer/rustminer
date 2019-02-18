@@ -15,18 +15,6 @@ use self::work::*;
 fn main() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
 
-//    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
-//    let ext_params = serde_json::json!({
-//            "version-rolling.mask": "1fffe000",
-//            "version-rolling.min-bit-count": 2
-//        });
-//
-//    // mining.configure
-//    let ret = pool.configure(exts, ext_params);
-//    println!("1,{:?}", ret);
-//    let ret = pool.try_read();
-//    println!("1.5,{:?}", ret);
-
     let connect_pool = pool.connect();
     let reader = Reader::create(&mut pool);
 
@@ -37,7 +25,8 @@ fn main() {
 
     let ws = WorkStream(pool.works.clone());
     let xnonce = pool.xnonce.clone();
-    let (sink, stream) = serial_framed("/dev/ttyUSB0").split();
+    let has_new_work = pool.has_new_work.clone();
+    let (sink, stream) = serial_framed("/dev/ttyS1").split();
     let sink = Arc::new(Mutex::new(sink));
 
     let connect_serial = {
@@ -74,7 +63,7 @@ fn main() {
                 let sink = sink.clone();
 
                 // send_subwork
-                SubworkMaker::new(w, &xnonce)
+                SubworkMaker::new(w, &xnonce, has_new_work.clone())
                     .for_each(move |sw| {
                         let sink = sink.clone();
                         // delay_send

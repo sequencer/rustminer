@@ -7,6 +7,7 @@ impl Reader {
     pub fn create(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send + 'static {
         let xnonce = pool.xnonce.clone();
         let works = pool.works.clone();
+        let has_new_work = pool.has_new_work.clone();
         let vermask = pool.vermask.clone();
         let diff = pool.diff.clone();
         pool.receiver()
@@ -23,6 +24,7 @@ impl Reader {
                                 Some(t) => t.notify(),
                                 None => (),
                             }
+                            *has_new_work.lock().unwrap() = Some(());
                             println!("received new work!");
                         }
                         Params::Integer([n]) => {
