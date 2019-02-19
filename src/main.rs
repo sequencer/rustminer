@@ -3,13 +3,14 @@ use std::time::{Duration, Instant};
 
 use tokio::prelude::*;
 use tokio::timer::Delay;
+use tokio_serial::SerialPort;
 
 pub mod stratum;
 mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::serial::serial_framed;
+use self::util::serial;
 use self::work::*;
 
 fn main() {
@@ -26,7 +27,9 @@ fn main() {
     let ws = WorkStream(pool.works.clone());
     let xnonce = pool.xnonce.clone();
     let has_new_work = pool.has_new_work.clone();
-    let (sink, stream) = serial_framed("/dev/ttyS1").split();
+    let serial = serial::new("/dev/ttyS1");
+    let serial_cloned = serial.try_clone().unwrap();
+    let (sink, stream) = serial::framed(serial).split();
     let sink = Arc::new(Mutex::new(sink));
 
     let connect_serial = {
@@ -63,20 +66,25 @@ fn main() {
                 let sink = sink.clone();
 
                 // send_subwork
-                SubworkMaker::new(w, &xnonce, has_new_work.clone())
-                    .for_each(move |sw| {
-                        let sink = sink.clone();
-                        // delay_send
-                        Delay::new(Instant::now() + Duration::from_millis(1))
-                            .and_then(move |_| {
-                                let mut sink = sink.lock().unwrap();
-                                sink.start_send(sw).unwrap();
-                                sink.poll_complete().unwrap();
-                                Ok(())
-                            })
-                            .map_err(failure::Error::from)
-                    })
-                    .map_err(|e| eprintln!("{}", e))
+                SubworkMaker::new(
+                    w,
+                    &xnonce,
+                    has_new_work.clone(),
+                    serial_cloned.try_clone().unwrap(),
+                )
+                .for_each(move |sw| {
+                    let sink = sink.clone();
+                    // delay_send
+                    Delay::new(Instant::now() + Duration::from_millis(1))
+                        .and_then(move |_| {
+                            let mut sink = sink.lock().unwrap();
+                            sink.start_send(sw).unwrap();
+                            sink.poll_complete().unwrap();
+                            Ok(())
+                        })
+                        .map_err(failure::Error::from)
+                })
+                .map_err(|e| eprintln!("{}", e))
             })
             .map_err(|_| ());
 

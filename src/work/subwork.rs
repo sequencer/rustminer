@@ -7,6 +7,7 @@ use futures::{Async, Poll};
 use super::super::stratum::Params;
 use super::super::util::hex::ToHex;
 use super::*;
+use tokio_serial::{ClearBuffer, SerialPort};
 
 #[derive(Clone, Debug, Default)]
 pub struct Subwork {
@@ -48,31 +49,42 @@ impl Subwork {
     }
 }
 
-#[derive(Debug)]
 pub struct SubworkMaker {
     work: Work,
     xnonce1: Bytes,
     xnonce2_size: usize,
     counter: BigUint,
+    serial_cloned: Box<SerialPort>,
     has_new_work: Arc<Mutex<Option<()>>>,
 }
 
 impl SubworkMaker {
-    pub fn new(work: Work, xnonce: &(Bytes, usize), has_new_work: Arc<Mutex<Option<()>>>) -> Self {
+    pub fn new(
+        work: Work,
+        xnonce: &(Bytes, usize),
+        has_new_work: Arc<Mutex<Option<()>>>,
+        serial_cloned: Box<SerialPort>,
+    ) -> Self {
         has_new_work.lock().unwrap().take();
         Self {
             work,
             xnonce1: Bytes::from(xnonce.0.as_ref()),
             xnonce2_size: xnonce.1,
             counter: BigUint::from(0u32),
+            serial_cloned,
             has_new_work,
         }
     }
 
     fn next(&mut self) -> Option<Subwork> {
-        if self.xnonce2_size * 8 < self.counter.bits()
-            || self.has_new_work.lock().unwrap().take().is_some()
-        {
+        if self.xnonce2_size * 8 < self.counter.bits() {
+            return None;
+        }
+
+        if self.has_new_work.lock().unwrap().take().is_some() {
+            if self.serial_cloned.clear(ClearBuffer::Output).is_ok() {
+                println!("serial buffer cleared!");
+            };
             return None;
         }
 

@@ -80,11 +80,9 @@ impl Decoder for Codec {
                         if let Some(ref sw) = &self.subworks[subworkid] {
                             let target = sw.target(&nonce);
 
-                            // debug
-                            print!("check target: ");
-                            print_hex(&target);
-
                             if target.starts_with(b"\0\0\0\0") {
+                                print!("target: ");
+                                print_hex(&target);
                                 subwork = self.subworks[subworkid].take();
                                 break;
                             }
@@ -124,7 +122,7 @@ impl Encoder for Codec {
     }
 }
 
-pub fn serial_framed<T: AsRef<Path>>(path: T) -> Framed<Serial, Codec> {
+pub fn new<T: AsRef<Path>>(path: T) -> Serial {
     let mut s = SerialPortSettings::default();
     s.baud_rate = 115_200;
 
@@ -133,25 +131,9 @@ pub fn serial_framed<T: AsRef<Path>>(path: T) -> Framed<Serial, Codec> {
     port.set_exclusive(false)
         .expect("set_exclusive(false) failed!");
 
-    Codec::default().framed(port)
+    port
 }
 
-#[test]
-fn serial_receive() {
-    use tokio::prelude::*;
-
-    #[cfg(unix)]
-    const PORT: &str = "/dev/ttyUSB0";
-    #[cfg(windows)]
-    const PORT: &str = "COM1";
-
-    let (_, reader) = serial_framed(PORT).split();
-    let printer = reader
-        .for_each(|s| {
-            println!("received: {:?}", s);
-            Ok(())
-        })
-        .map_err(|e| eprintln!("{}", e));
-
-    tokio::run(printer);
+pub fn framed(port: Serial) -> Framed<Serial, Codec> {
+    Codec::default().framed(port)
 }
