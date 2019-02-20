@@ -135,9 +135,7 @@ impl Pool {
     }
 
     pub fn send<T: serde::Serialize>(&mut self, msg: T) -> impl Future {
-        let mut data = serde_json::to_string(&msg).unwrap();
-        data.push('\n');
-        self.sender().send(data)
+        self.sender().send(serde_json::to_string(&msg).unwrap())
     }
 
     pub fn subscribe(&mut self) {
