@@ -20,7 +20,7 @@ pub struct Subwork {
 
 impl Subwork {
     pub fn target(&self, nonce: &Bytes) -> Bytes {
-        let mut target = BytesMut::new();
+        let mut target = BytesMut::with_capacity(32);
         target.extend(&self.block_header);
         target.extend(nonce);
         target = target.flip32().sha256d();
@@ -29,7 +29,7 @@ impl Subwork {
     }
 
     pub fn target_diff(target: &Bytes) -> BigUint {
-        static NUM: [u32; 7] = [0xffff_ffff; 7];
+        const NUM: [u32; 7] = [0xffff_ffff; 7];
         BigUint::from_slice(&NUM) / BigUint::from_bytes_be(target)
     }
 
