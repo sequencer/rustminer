@@ -4,9 +4,9 @@ use bytes::BytesMut;
 use futures::stream::Stream;
 use futures::{Async, Poll};
 
-use super::super::stratum::Params;
-use super::super::util::hex::ToHex;
 use super::*;
+use crate::stratum::Params;
+use crate::util::ToHex;
 use tokio_serial::{ClearBuffer, SerialPort};
 
 #[derive(Clone, Debug, Default)]

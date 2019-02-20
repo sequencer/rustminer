@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use super::super::util::hex_to;
 use super::*;
+use crate::util::hex_to;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Action {

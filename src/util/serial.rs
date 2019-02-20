@@ -9,8 +9,8 @@ use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
 
 #[allow(unused_imports)]
-use super::super::util::print_hex;
-use super::super::work::Subwork;
+use crate::util::print_hex;
+use crate::work::Subwork;
 
 fn crc5_usb(data: &[u8]) -> u8 {
     lazy_static! {

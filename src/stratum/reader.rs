@@ -1,5 +1,5 @@
-use super::super::util::hex_to;
 use super::*;
+use crate::util::{hex_to, ToHex};
 
 pub struct Reader;
 
@@ -56,8 +56,9 @@ impl Reader {
                             xnonce.0 = r.1;
                             xnonce.1 = r.2;
                             println!(
-                                "=> set xnonce1: {:?}, xnonce2_size: {}!",
-                                xnonce.0, xnonce.1
+                                "=> set xnonce1: 0x{}, xnonce2_size: {}!",
+                                xnonce.0.to_hex(),
+                                xnonce.1
                             );
                         }
                         ResultOf::Configure(r) => {
