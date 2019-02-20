@@ -10,7 +10,7 @@ mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::serial;
+use self::util::{serial, ToHex};
 use self::work::*;
 
 fn main() {
@@ -36,12 +36,11 @@ fn main() {
         let pool_diff = pool.diff.clone();
         let receive_from_asic = stream
             .for_each(move |sw| {
-                println!("received: {:?}", sw);
                 let diff = sw.0.diff(&sw.1);
                 let pool_diff = pool_diff.lock().unwrap();
                 let pool_sender = pool_sender.clone();
                 if diff >= *pool_diff {
-                    let params = sw.0.into_params("h723n8m.002", sw.1);
+                    let params = sw.0.into_params("h723n8m.002", &sw.1);
                     let msg = Action {
                         id: Some(4),
                         method: String::from("mining.submit"),
@@ -50,6 +49,7 @@ fn main() {
                     let mut data = msg.to_string().unwrap();
                     data.push('\n');
                     tokio::spawn(pool_sender.send(data).and_then(|_| Ok(())).map_err(|_| ()));
+                    println!("submit nonce: 0x{} (difficulty: {})", sw.1.to_hex(), diff);
                 } else {
                     eprintln!(
                         "nonce difficulty {} is too low, require {}!",

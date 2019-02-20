@@ -38,11 +38,11 @@ impl Subwork {
         Self::target_diff(&target)
     }
 
-    pub fn into_params(self, name: &str, nonce: Bytes) -> Params {
+    pub fn into_params(self, name: &str, nonce: &Bytes) -> Params {
         Params::Submit([
             String::from(name),
             self.workid,
-            format!("{:0>8}", self.xnonce2.to_hex()),
+            self.xnonce2.to_hex(),
             self.block_header[68..72].to_hex(),
             nonce.to_hex(),
         ])

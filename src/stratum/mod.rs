@@ -91,7 +91,7 @@ impl Pool {
         Some(*counter)
     }
 
-    pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send + 'static {
+    pub fn connect(&mut self) -> impl Future<Item=(), Error=()> + Send + 'static {
         let (reader_tx, reader_rx) = channel::<String>(4096);
         self.reader = Some(reader_rx);
 
@@ -117,6 +117,7 @@ impl Pool {
 
         let writer = writer_rx
             .map_err(|_| std::io::Error::from_raw_os_error(-1))
+            .inspect(|s| { dbg!(s); })
             .forward(sink)
             .map_err(|_| ());
 

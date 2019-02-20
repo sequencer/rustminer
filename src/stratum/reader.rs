@@ -39,10 +39,16 @@ impl Reader {
                 } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
                     match s.result {
                         ResultOf::Authorize(r) => {
+                            let action = match s.id {
+                                Some(2) => "authorized",
+                                Some(4) => "submit",
+                                _ => "unknown",
+                            };
+
                             if r {
-                                println!("authorized successfully!");
+                                println!("{} successfully!", action);
                             } else {
-                                println!("authorized failed!");
+                                println!("{} failed!", action);
                             }
                         }
                         ResultOf::Subscribe(r) => {
