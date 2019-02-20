@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::iter::FromIterator;
 use std::path::Path;
 
@@ -9,7 +10,7 @@ use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
 
 #[allow(unused_imports)]
-use crate::util::print_hex;
+use crate::util::{print_hex, ToHex};
 use crate::work::Subwork;
 
 fn crc5_usb(data: &[u8]) -> u8 {
@@ -39,7 +40,7 @@ fn crc16_ccitt_false(data: &[u8]) -> u16 {
 pub struct Codec {
     subworkid: u8,
     subworks: Vec<Option<Subwork>>,
-    received: BytesMut,
+    received: VecDeque<BytesMut>,
 }
 
 impl Default for Codec {
@@ -47,7 +48,7 @@ impl Default for Codec {
         Self {
             subworkid: 0,
             subworks: vec![None; 256],
-            received: BytesMut::new(),
+            received: VecDeque::with_capacity(2),
         }
     }
 }
@@ -60,38 +61,48 @@ impl Decoder for Codec {
         &mut self,
         src: &mut BytesMut,
     ) -> Result<Option<<Self as Decoder>::Item>, <Self as Decoder>::Error> {
-        loop {
+        'outer: loop {
             if let Some(n) = src.iter().position(|b| *b == 0x55) {
                 if src.len() >= n + 7 {
-                    // process next nonce
-                    if self.received.starts_with(&src[n..n + 5]) {
-                        src.split_to(n + 7);
-                        continue;
+                    for received in &self.received {
+                        // process next nonce
+                        if received.starts_with(&src[n..n + 5]) {
+                            src.split_to(n + 7);
+                            continue 'outer;
+                        }
                     }
 
                     if crc5_usb_check(&src[n..n + 7]) {
-                        self.received = src.split_to(n + 7).split_off(n);
-                        let id = self.received[5] as usize;
-                        let nonce = Bytes::from_iter(self.received[1..5].iter().rev().cloned());
+                        let received = src.split_to(n + 7).split_off(n);
+                        let id = received[5];
+                        let nonce = Bytes::from_iter(received[1..5].iter().rev().cloned());
 
                         // check subwork
                         let mut subwork = None;
-                        if let Some(ref sw) = &self.subworks[id] {
-                            let target = sw.target(&nonce);
-                            if target.starts_with(b"\0\0\0\0") {
-                                print!("target: ");
-                                print_hex(&target);
-                                subwork = self.subworks[id].take();
+                        let mut target;
+                        for i in 0..2u8 {
+                            if let Some(ref sw) = &self.subworks[id.wrapping_sub(i) as usize] {
+                                target = sw.target(&nonce);
+                                if target.starts_with(b"\0\0\0\0") {
+                                    print!("received: {}, id: {}, target: ", received.to_hex(), id);
+                                    print_hex(&target);
+                                    subwork = Some(sw.clone());
+                                    break;
+                                }
                             }
                         }
 
+                        self.received.push_front(received);
+                        self.received.truncate(2);
+
                         if subwork.is_none() {
+                            // debug
                             print!("lost the subwork of nonce (id: {}): ", id);
-                            print_hex(&self.received);
+                            print_hex(&self.received.front().unwrap());
 
                             // process next nonce
                             if src.len() >= 7 {
-                                continue;
+                                continue 'outer;
                             }
                         }
 
