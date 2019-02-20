@@ -37,7 +37,7 @@ fn crc16_ccitt_false(data: &[u8]) -> u16 {
 
 #[derive(Debug)]
 pub struct Codec {
-    subworkid: usize,
+    subworkid: u8,
     subworks: Vec<Option<Subwork>>,
     received: BytesMut,
 }
@@ -46,7 +46,7 @@ impl Default for Codec {
     fn default() -> Self {
         Self {
             subworkid: 0,
-            subworks: vec![None; 0x3fff + 1],
+            subworks: vec![None; 256],
             received: BytesMut::new(),
         }
     }
@@ -60,48 +60,49 @@ impl Decoder for Codec {
         &mut self,
         src: &mut BytesMut,
     ) -> Result<Option<<Self as Decoder>::Item>, <Self as Decoder>::Error> {
-        if let Some(n) = src.iter().position(|b| *b == 0x55) {
-            if src.len() >= n + 7 {
-                let item = &src[n..n + 7];
-                if item == self.received.as_ref() {
-                    drop(src.split_to(n + 7));
-                    return Ok(None);
-                }
+        loop {
+            if let Some(n) = src.iter().position(|b| *b == 0x55) {
+                if src.len() >= n + 7 {
+                    // process next nonce
+                    if self.received.starts_with(&src[n..n + 5]) {
+                        src.split_to(n + 7);
+                        continue;
+                    }
 
-                if crc5_usb_check(item) {
-                    self.received = src.split_to(n + 7).split_off(n);
-                    let id = self.received[5] as usize;
-                    let nonce = Bytes::from_iter(self.received[1..5].iter().rev().cloned());
+                    if crc5_usb_check(&src[n..n + 7]) {
+                        self.received = src.split_to(n + 7).split_off(n);
+                        let id = self.received[5] as usize;
+                        let nonce = Bytes::from_iter(self.received[1..5].iter().rev().cloned());
 
-                    let mut subworkid;
-                    let mut subwork = None;
-                    for i in 0..0x3fusize {
-                        subworkid = i << 8 | id;
-                        if let Some(ref sw) = &self.subworks[subworkid] {
+                        // check subwork
+                        let mut subwork = None;
+                        if let Some(ref sw) = &self.subworks[id] {
                             let target = sw.target(&nonce);
-
                             if target.starts_with(b"\0\0\0\0") {
                                 print!("target: ");
                                 print_hex(&target);
-                                subwork = self.subworks[subworkid].take();
-                                break;
+                                subwork = self.subworks[id].take();
                             }
                         }
-                    }
 
-                    // debug
-                    if subwork.is_none() {
-                        eprint!("!!! lost the subwork of nonce: ");
-                        print_hex(&nonce);
-                    }
+                        if subwork.is_none() {
+                            print!("lost the subwork of nonce (id: {}): ", id);
+                            print_hex(&self.received);
 
-                    return Ok(subwork.map(|sw| (sw, nonce)));
-                } else {
-                    src.split_to(n);
+                            // process next nonce
+                            if src.len() >= 7 {
+                                continue;
+                            }
+                        }
+
+                        return Ok(subwork.map(|sw| (sw, nonce)));
+                    } else {
+                        src.split_to(n + 1);
+                    }
                 }
             }
+            return Ok(None);
         }
-        Ok(None)
     }
 }
 
@@ -112,11 +113,11 @@ impl Encoder for Codec {
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
         dst.reserve(49);
         dst.extend(b"\x20\x31");
-        dst.put_u8(self.subworkid.to_le_bytes()[0]);
+        dst.put_u8(self.subworkid);
         dst.extend(item.data2.iter().rev());
         dst.extend(item.midstate.iter().rev());
         dst.extend(&crc16_ccitt_false(dst.as_ref()).to_be_bytes());
-        self.subworks[self.subworkid & 0x3fff] = Some(item);
+        self.subworks[self.subworkid as usize] = Some(item);
         self.subworkid = self.subworkid.wrapping_add(1);
         Ok(())
     }
