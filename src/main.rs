@@ -46,8 +46,7 @@ fn main() {
                         method: String::from("mining.submit"),
                         params,
                     };
-                    let mut data = msg.to_string().unwrap();
-                    data.push('\n');
+                    let data = msg.to_string().unwrap();
                     tokio::spawn(pool_sender.send(data).and_then(|_| Ok(())).map_err(|_| ()));
                     println!("submit nonce: 0x{} (difficulty: {})", sw.1.to_hex(), diff);
                 } else {
