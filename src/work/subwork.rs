@@ -3,11 +3,12 @@ use std::sync::{Arc, Mutex};
 use bytes::BytesMut;
 use futures::stream::Stream;
 use futures::{Async, Poll};
+use num_traits::cast::ToPrimitive;
+use tokio_serial::{ClearBuffer, SerialPort};
 
 use super::*;
 use crate::stratum::Params;
 use crate::util::ToHex;
-use tokio_serial::{ClearBuffer, SerialPort};
 
 #[derive(Clone, Debug, Default)]
 pub struct Subwork {
@@ -28,12 +29,11 @@ impl Subwork {
         target.freeze()
     }
 
-    pub fn target_diff(target: &Bytes) -> BigUint {
-        const NUM: [u32; 7] = [0xffff_ffff; 7];
-        BigUint::from_slice(&NUM) / BigUint::from_bytes_be(target)
+    pub fn target_diff(target: &Bytes) -> f64 {
+        2.695_994_666_715_064e67 / BigUint::from_bytes_be(target).to_f64().unwrap()
     }
 
-    pub fn diff(&self, nonce: &Bytes) -> BigUint {
+    pub fn diff(&self, nonce: &Bytes) -> f64 {
         let target = self.target(nonce);
         Self::target_diff(&target)
     }

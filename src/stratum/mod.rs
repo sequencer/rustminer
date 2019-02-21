@@ -6,7 +6,6 @@ use bytes::Bytes;
 use futures::stream::Stream;
 use futures::task::Task;
 use futures::{Async, Future, Poll};
-use num_bigint::BigUint;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
@@ -67,7 +66,7 @@ pub struct Pool {
     pub works: Arc<Mutex<(WorkDeque, Option<Task>)>>,
     pub has_new_work: Arc<Mutex<Option<()>>>,
     pub vermask: Arc<Mutex<Option<Bytes>>>,
-    pub diff: Arc<Mutex<BigUint>>,
+    pub diff: Arc<Mutex<f64>>,
 }
 
 impl Pool {
@@ -81,7 +80,7 @@ impl Pool {
             works: Arc::new(Mutex::new((WorkDeque::default(), None))),
             has_new_work: Arc::new(Mutex::new(None)),
             vermask: Arc::new(Mutex::new(None)),
-            diff: Arc::new(Mutex::new(BigUint::default())),
+            diff: Arc::new(Mutex::new(1.0)),
         }
     }
 
@@ -104,7 +103,6 @@ impl Pool {
 
         let reader = stream
             .for_each(move |line| {
-                dbg!(&line);
                 let send = reader_tx
                     .clone()
                     .send(line)

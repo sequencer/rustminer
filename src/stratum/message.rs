@@ -24,7 +24,7 @@ pub struct Respond {
 pub enum Params {
     Work(Work),
     Bool(bool),
-    Integer([u32; 1]),
+    Num([f64; 1]),
     TMask(TMask),
     User([String; 2]),
     Config(Config),
@@ -48,13 +48,10 @@ pub enum ResultOf {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultOfSubscribe(
-    pub [StringWithBytes; 2], // set_difficulty & notify
+    pub [[String; 2]; 2], // set_difficulty & notify
     #[serde(deserialize_with = "hex_to::bytes")] pub Bytes, // xnonce1
-    pub usize,                // xnonce2_size
+    pub usize,            // xnonce2_size
 );
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StringWithBytes(String, #[serde(deserialize_with = "hex_to::bytes")] Bytes);
 
 pub trait ToJsonString: serde::Serialize {
     fn to_string(&self) -> serde_json::Result<String> {

@@ -12,6 +12,7 @@ impl Reader {
         let diff = pool.diff.clone();
         pool.receiver()
             .for_each(move |line| {
+                dbg!(&line);
                 if let Ok(s) = serde_json::from_str::<Action>(&line) {
                     match s.params {
                         Params::Work(w) => {
@@ -25,13 +26,12 @@ impl Reader {
                                 None => (),
                             }
                             *has_new_work.lock().unwrap() = Some(());
-                            println!("received new work!");
+                            println!("=> received new work!");
                         }
-                        Params::Integer([n]) => {
+                        Params::Num([n]) => {
                             if s.method.as_str() == "mining.set_difficulty" {
-                                let mut diff = diff.lock().unwrap();
-                                *diff = BigUint::from(n);
-                                println!("set difficulty: {}!", n);
+                                println!("=> set difficulty: {}!", &n);
+                                *diff.lock().unwrap() = n;
                             }
                         }
                         _ => println!("=> {}: {:?}", s.method, s.params),
@@ -46,9 +46,9 @@ impl Reader {
                             };
 
                             if r {
-                                println!("{} successfully!", action);
+                                println!("=> {} successfully!", action);
                             } else {
-                                println!("{} failed!", action);
+                                println!("=> {} failed!", action);
                             }
                         }
                         ResultOf::Subscribe(r) => {
@@ -72,10 +72,13 @@ impl Reader {
                                         *vermask = Some(mask);
                                         println!("=> set vermask: {:?}!", *vermask);
                                     } else {
-                                        println!("the pool does not support version-rolling!");
+                                        println!("=> the pool does not support version-rolling!");
                                     }
                                 } else if let serde_json::Value::String(e) = result {
-                                    println!("the pool does not support version-rolling: {:?}!", e);
+                                    println!(
+                                        "=> the pool does not support version-rolling: {:?}!",
+                                        e
+                                    );
                                 }
                             }
                         }

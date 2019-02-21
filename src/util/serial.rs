@@ -67,7 +67,7 @@ impl Decoder for Codec {
                     for received in &self.received {
                         // process next nonce
                         if received.starts_with(&src[n..n + 5]) {
-                            src.split_to(n + 7);
+                            println!("duplicate data: {}!", src.split_to(n + 7).to_hex());
                             continue 'outer;
                         }
                     }
@@ -80,7 +80,7 @@ impl Decoder for Codec {
                         // check subwork
                         let mut subwork = None;
                         let mut target;
-                        for i in 0..2u8 {
+                        for i in 0..4u8 {
                             if let Some(ref sw) = &self.subworks[id.wrapping_sub(i) as usize] {
                                 target = sw.target(&nonce);
                                 if target.starts_with(b"\0\0\0\0") {
@@ -136,7 +136,7 @@ impl Encoder for Codec {
 
 pub fn new<T: AsRef<Path>>(path: T) -> Serial {
     let mut s = SerialPortSettings::default();
-    s.baud_rate = 115_200;
+    s.baud_rate = 1_500_000;
 
     let mut port = Serial::from_path(path, &s).unwrap();
     #[cfg(unix)]
