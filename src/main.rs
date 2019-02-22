@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::prelude::*;
 use tokio::timer::Delay;
@@ -74,7 +74,7 @@ fn main() {
                 .for_each(move |sw| {
                     let sink = sink.clone();
                     // delay_send
-                    Delay::new(Instant::now() + Duration::from_millis(1))
+                    Delay::new(Instant::now())
                         .and_then(move |_| {
                             let mut sink = sink.lock().unwrap();
                             sink.start_send(sw).unwrap();

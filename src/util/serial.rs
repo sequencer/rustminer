@@ -67,7 +67,8 @@ impl Decoder for Codec {
                     for received in &self.received {
                         // process next nonce
                         if received.starts_with(&src[n..n + 5]) {
-                            println!("duplicate data: {}!", src.split_to(n + 7).to_hex());
+                            let _drop = src.split_to(n + 7);
+                            // println!("duplicate data: {}!", _drop.to_hex());
                             continue 'outer;
                         }
                     }
@@ -97,8 +98,8 @@ impl Decoder for Codec {
 
                         if subwork.is_none() {
                             // debug
-                            print!("lost the subwork of nonce (id: {}): ", id);
-                            print_hex(&self.received.front().unwrap());
+                            // print!("lost the subwork of nonce (id: {}): ", id);
+                            // print_hex(&self.received.front().unwrap());
 
                             // process next nonce
                             if src.len() >= 7 {
