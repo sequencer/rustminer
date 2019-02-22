@@ -11,7 +11,7 @@ pub struct Action {
     pub params: Params,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Respond {
     pub id: Option<u32>,
     pub result: ResultOf,
@@ -38,7 +38,7 @@ pub struct TMask(#[serde(deserialize_with = "hex_to::bytes_vec")] Vec<Bytes>);
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config(pub Vec<String>, pub serde_json::Value);
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum ResultOf {
     Configure(serde_json::map::Map<String, serde_json::Value>),
@@ -46,12 +46,19 @@ pub enum ResultOf {
     Subscribe(ResultOfSubscribe),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct ResultOfSubscribe(
-    pub [[String; 2]; 2], // set_difficulty & notify
+    pub ResultOfSubscribe0, // set_difficulty & notify
     #[serde(deserialize_with = "hex_to::bytes")] pub Bytes, // xnonce1
-    pub usize,            // xnonce2_size
+    pub usize,              // xnonce2_size
 );
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum ResultOfSubscribe0 {
+    A([String; 2]),
+    B([[String; 2]; 2]),
+}
 
 pub trait ToJsonString: serde::Serialize {
     fn to_string(&self) -> serde_json::Result<String> {
