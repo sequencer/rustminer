@@ -54,7 +54,7 @@ impl Default for Codec {
 }
 
 impl Decoder for Codec {
-    type Item = (Subwork, Bytes);
+    type Item = (Subwork, Bytes, Bytes);
     type Error = io::Error;
 
     fn decode(
@@ -80,13 +80,17 @@ impl Decoder for Codec {
 
                         // check subwork
                         let mut subwork = None;
-                        let mut target;
+                        let mut target = Bytes::default();
                         for i in 0..4u8 {
                             if let Some(ref sw) = &self.subworks[id.wrapping_sub(i) as usize] {
                                 target = sw.target(&nonce);
                                 if target.starts_with(b"\0\0\0\0") {
-                                    print!("received: {}, id: {}, target: ", received.to_hex(), id);
-                                    print_hex(&target);
+                                    println!(
+                                        "received: 0x{}, id: {}, target: 0x{}",
+                                        received.to_hex(),
+                                        id,
+                                        target.to_hex()
+                                    );
                                     subwork = Some(sw.clone());
                                     break;
                                 }
@@ -107,7 +111,7 @@ impl Decoder for Codec {
                             }
                         }
 
-                        return Ok(subwork.map(|sw| (sw, nonce)));
+                        return Ok(subwork.map(|sw| (sw, target, nonce)));
                     } else {
                         src.split_to(n + 1);
                     }

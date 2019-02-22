@@ -36,11 +36,11 @@ fn main() {
         let pool_diff = pool.diff.clone();
         let receive_from_asic = stream
             .for_each(move |sw| {
-                let diff = sw.0.diff(&sw.1);
+                let diff = Subwork::target_diff(&sw.1);
                 let pool_diff = pool_diff.lock().unwrap();
                 let pool_sender = pool_sender.clone();
                 if diff >= *pool_diff {
-                    let params = sw.0.into_params("h723n8m.002", &sw.1);
+                    let params = sw.0.into_params("h723n8m.002", &sw.2);
                     let msg = Action {
                         id: Some(4),
                         method: String::from("mining.submit"),
