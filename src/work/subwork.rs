@@ -77,14 +77,14 @@ impl SubworkMaker {
     }
 
     fn next(&mut self) -> Option<Subwork> {
-        if self.xnonce2_size * 8 < self.counter.bits() {
-            return None;
-        }
-
         if self.has_new_work.lock().unwrap().take().is_some() {
             if self.serial_cloned.clear(ClearBuffer::Output).is_ok() {
                 println!("serial buffer cleared!");
             };
+            return None;
+        }
+
+        if self.xnonce2_size * 8 < self.counter.bits() {
             return None;
         }
 
@@ -106,9 +106,6 @@ impl Stream for SubworkMaker {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.next() {
-            Some(sw) => Ok(Async::Ready(Some(sw))),
-            None => Ok(Async::Ready(None)),
-        }
+        Ok(Async::Ready(self.next()))
     }
 }

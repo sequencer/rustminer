@@ -4,7 +4,7 @@ use crate::util::{hex_to, ToHex};
 pub struct Reader;
 
 impl Reader {
-    pub fn create(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send + 'static {
+    pub fn create(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send {
         let xnonce = pool.xnonce.clone();
         let works = pool.works.clone();
         let has_new_work = pool.has_new_work.clone();

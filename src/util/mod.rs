@@ -47,12 +47,6 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
     Bytes::from_iter(sha256.state().iter().flat_map(|x| x.to_le_bytes().to_vec()))
 }
 
-#[allow(dead_code)]
-pub fn print_hex(data: &[u8]) {
-    print!("0x");
-    println!("{}", data.to_hex());
-}
-
 pub mod hex_to {
     use super::*;
     use serde::{de, Deserialize, Deserializer};

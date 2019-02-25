@@ -10,7 +10,7 @@ use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
 
 #[allow(unused_imports)]
-use crate::util::{print_hex, ToHex};
+use crate::util::ToHex;
 use crate::work::Subwork;
 
 fn crc5_usb(data: &[u8]) -> u8 {
@@ -54,7 +54,7 @@ impl Default for Codec {
 }
 
 impl Decoder for Codec {
-    type Item = (Subwork, Bytes, Bytes);
+    type Item = (Subwork, Bytes, Bytes); // (subwork, nonce, target)
     type Error = io::Error;
 
     fn decode(
@@ -68,7 +68,7 @@ impl Decoder for Codec {
                         // process next nonce
                         if received.starts_with(&src[n..n + 5]) {
                             let _drop = src.split_to(n + 7);
-                            // println!("duplicate data: {}!", _drop.to_hex());
+                            println!("duplicate data: 0x{}!", _drop.to_hex());
                             continue 'outer;
                         }
                     }
@@ -81,7 +81,7 @@ impl Decoder for Codec {
                         // check subwork
                         let mut subwork = None;
                         let mut target = Bytes::default();
-                        for i in 0..4u8 {
+                        for i in 0..4 {
                             if let Some(ref sw) = &self.subworks[id.wrapping_sub(i) as usize] {
                                 target = sw.target(&nonce);
                                 if target.starts_with(b"\0\0\0\0") {
@@ -102,8 +102,11 @@ impl Decoder for Codec {
 
                         if subwork.is_none() {
                             // debug
-                            // print!("lost the subwork of nonce (id: {}): ", id);
-                            // print_hex(&self.received.front().unwrap());
+                            print!(
+                                "lost the subwork of received data (id: {}): 0x{}",
+                                id,
+                                self.received.front().unwrap().to_hex()
+                            );
 
                             // process next nonce
                             if src.len() >= 7 {

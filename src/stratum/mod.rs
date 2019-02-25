@@ -90,7 +90,7 @@ impl Pool {
         Some(*counter)
     }
 
-    pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send + 'static {
+    pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send {
         let (reader_tx, reader_rx) = channel::<String>(4096);
         self.reader = Some(reader_rx);
 

@@ -20,7 +20,7 @@ fn main() {
     let reader = Reader::create(&mut pool);
 
     pool.subscribe();
-    pool.authorize("h723n8m.002", "");
+    pool.authorize("h723n8m.001", "");
 
     let pool_sender = pool.sender();
 
@@ -40,7 +40,7 @@ fn main() {
                 let pool_diff = pool_diff.lock().unwrap();
                 let pool_sender = pool_sender.clone();
                 if diff >= *pool_diff {
-                    let params = sw.0.into_params("h723n8m.002", &sw.2);
+                    let params = sw.0.into_params("h723n8m.001", &sw.2);
                     let msg = Action {
                         id: Some(4),
                         method: String::from("mining.submit"),
