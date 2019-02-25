@@ -19,8 +19,6 @@ pub use self::message::*;
 pub use self::reader::Reader;
 use super::work::*;
 
-pub type Result<T> = std::result::Result<T, failure::Error>;
-
 #[derive(Debug, Default)]
 pub struct WorkDeque(VecDeque<Work>);
 
@@ -106,8 +104,7 @@ impl Pool {
                 let send = reader_tx
                     .clone()
                     .send(line)
-                    .and_then(|_| Ok(()))
-                    .map_err(|_| ());
+                    .then(|_| Ok(()));
                 tokio::spawn(send);
                 Ok(())
             })

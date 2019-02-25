@@ -102,7 +102,7 @@ impl Decoder for Codec {
 
                         if subwork.is_none() {
                             // debug
-                            print!(
+                            println!(
                                 "lost the subwork of received data (id: {}): 0x{}",
                                 id,
                                 self.received.front().unwrap().to_hex()

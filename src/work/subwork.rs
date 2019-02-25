@@ -103,7 +103,7 @@ impl SubworkMaker {
 
 impl Stream for SubworkMaker {
     type Item = Subwork;
-    type Error = failure::Error;
+    type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         Ok(Async::Ready(self.next()))

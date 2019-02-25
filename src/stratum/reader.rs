@@ -21,11 +21,12 @@ impl Reader {
                                 works.0.clear();
                             }
                             works.0.push_back(w);
-                            match &works.1 {
-                                Some(t) => t.notify(),
-                                None => (),
-                            }
+
                             *has_new_work.lock().unwrap() = Some(());
+                            if let Some(t) = &works.1 {
+                                t.notify();
+                            }
+
                             println!("=> received new work!");
                         }
                         Params::Num([n]) => {

@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::thread;
+use std::time::Duration;
 
 use tokio::prelude::*;
-use tokio::timer::Delay;
+use tokio::runtime::current_thread;
 use tokio_serial::SerialPort;
 
 pub mod stratum;
@@ -47,7 +48,7 @@ fn main() {
                         params,
                     };
                     let data = msg.to_string().unwrap();
-                    tokio::spawn(pool_sender.send(data).and_then(|_| Ok(())).map_err(|_| ()));
+                    tokio::spawn(pool_sender.send(data).then(|_| Ok(())));
                     println!("submit nonce: 0x{} (difficulty: {})", sw.1.to_hex(), diff);
                 } else {
                     eprintln!(
@@ -60,36 +61,33 @@ fn main() {
             .map_err(|e| eprintln!("{}", e));
 
         let send_to_asic = ws
-            .for_each(move |w| {
-                let xnonce = xnonce.lock().unwrap();
-                let sink = sink.clone();
-
-                // send_subwork
+            .map(move |w| {
                 SubworkMaker::new(
                     w,
-                    &xnonce,
+                    &xnonce.lock().unwrap(),
                     has_new_work.clone(),
                     serial_cloned.try_clone().unwrap(),
                 )
-                .for_each(move |sw| {
-                    let sink = sink.clone();
-                    // delay_send
-                    Delay::new(Instant::now())
-                        .and_then(move |_| {
-                            let mut sink = sink.lock().unwrap();
-                            sink.start_send(sw).unwrap();
-                            sink.poll_complete().unwrap();
-                            Ok(())
-                        })
-                        .map_err(failure::Error::from)
-                })
-                .map_err(|e| eprintln!("{}", e))
             })
-            .map_err(|_| ());
+            .flatten()
+            .for_each(move |sw| {
+                let mut sink = sink.lock().unwrap();
+                sink.start_send(sw).unwrap();
+                sink.poll_complete().unwrap();
+                thread::sleep(Duration::from_micros(1000));
+                Ok(())
+            });
 
-        receive_from_asic.join(send_to_asic).then(|_| Ok(()))
+        thread::spawn(move || {
+            let mut runtime = current_thread::Runtime::new().unwrap();
+            runtime.block_on(send_to_asic).unwrap();
+        });
+        receive_from_asic
     };
 
-    let task = connect_pool.join3(reader, connect_serial).then(|_| Ok(()));
-    tokio::run(task);
+    let task = connect_pool
+        .join3(reader, connect_serial)
+        .then(|_| Result::<_, ()>::Ok(()));
+    let mut runtime = current_thread::Runtime::new().unwrap();
+    runtime.block_on(task).unwrap();
 }
