@@ -5,8 +5,10 @@ use sha256::Sha256;
 
 pub mod hex;
 pub mod serial;
+mod sinkhook;
 
 pub use self::hex::{FromHex, ToHex};
+pub use sinkhook::SinkHook;
 
 pub trait Flip32: Sized {
     fn flip32(self) -> Self;

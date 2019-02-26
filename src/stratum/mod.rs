@@ -20,6 +20,7 @@ mod reader;
 pub use self::message::*;
 pub use self::reader::Reader;
 use super::work::*;
+use crate::util::SinkHook;
 
 #[derive(Debug, Default)]
 pub struct WorkDeque(VecDeque<Work>);
@@ -113,16 +114,14 @@ impl Pool {
             })
             .map_err(|_| ());
 
-        let last_active1 = self.last_active.clone();
-        let last_active2 = self.last_active.clone();
+        let last_active = self.last_active.clone();
         let writer = writer_rx
-            .map_err(|_| ())
+            .map_err(|_| std::io::Error::from_raw_os_error(-1))
             .inspect(move |s| {
-                *last_active1.lock().unwrap() = Ok(Instant::now());
                 dbg!(s);
             })
-            .forward(sink.sink_map_err(move |e| {
-                *last_active2.lock().unwrap() = Err(e);
+            .forward(SinkHook::new(sink, move || {
+                *last_active.lock().unwrap() = Ok(Instant::now());
             }))
             .map_err(|_| ());
 
