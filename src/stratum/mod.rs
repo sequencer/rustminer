@@ -1,11 +1,13 @@
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use bytes::Bytes;
 use futures::stream::Stream;
 use futures::task::Task;
 use futures::{Async, Future, Poll};
+use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
@@ -65,6 +67,7 @@ pub struct Pool {
     pub has_new_work: Arc<Mutex<Option<()>>>,
     pub vermask: Arc<Mutex<Option<Bytes>>>,
     pub diff: Arc<Mutex<f64>>,
+    pub last_active: Arc<Mutex<Result<Instant, io::Error>>>,
 }
 
 impl Pool {
@@ -79,6 +82,7 @@ impl Pool {
             has_new_work: Arc::new(Mutex::new(None)),
             vermask: Arc::new(Mutex::new(None)),
             diff: Arc::new(Mutex::new(1.0)),
+            last_active: Arc::new(Mutex::new(Ok(Instant::now()))),
         }
     }
 
@@ -99,23 +103,27 @@ impl Pool {
         let tcpstream = TcpStream::from_std(tcpstream, &Handle::default()).unwrap();
         let (sink, stream) = LinesCodec::new().framed(tcpstream).split();
 
+        let last_active = self.last_active.clone();
         let reader = stream
+            .inspect(move |_| *last_active.lock().unwrap() = Ok(Instant::now()))
             .for_each(move |line| {
-                let send = reader_tx
-                    .clone()
-                    .send(line)
-                    .then(|_| Ok(()));
+                let send = reader_tx.clone().send(line).then(|_| Ok(()));
                 tokio::spawn(send);
                 Ok(())
             })
             .map_err(|_| ());
 
+        let last_active1 = self.last_active.clone();
+        let last_active2 = self.last_active.clone();
         let writer = writer_rx
-            .map_err(|_| std::io::Error::from_raw_os_error(-1))
-            .inspect(|s| {
+            .map_err(|_| ())
+            .inspect(move |s| {
+                *last_active1.lock().unwrap() = Ok(Instant::now());
                 dbg!(s);
             })
-            .forward(sink)
+            .forward(sink.sink_map_err(move |e| {
+                *last_active2.lock().unwrap() = Err(e);
+            }))
             .map_err(|_| ());
 
         reader.join(writer).then(|_| Ok(()))
@@ -130,7 +138,9 @@ impl Pool {
     }
 
     pub fn send<T: serde::Serialize>(&mut self, msg: T) -> impl Future {
-        self.sender().send(serde_json::to_string(&msg).unwrap())
+        self.sender()
+            .send(serde_json::to_string(&msg).unwrap())
+            .and_then(|_| Ok(()))
     }
 
     pub fn subscribe(&mut self) {
