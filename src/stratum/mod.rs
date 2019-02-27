@@ -14,6 +14,7 @@ use tokio::reactor::Handle;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio_codec::{Decoder, LinesCodec};
 
+pub mod checker;
 mod message;
 mod reader;
 

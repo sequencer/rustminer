@@ -19,6 +19,8 @@ fn main() {
 
     let connect_pool = pool.connect();
     let reader = Reader::create(&mut pool);
+    let checker = checker::new(&mut pool);
+    let connect_pool = connect_pool.join3(reader, checker);
 
     pool.subscribe();
     pool.authorize("h723n8m.001", "");
@@ -86,7 +88,7 @@ fn main() {
     };
 
     let task = connect_pool
-        .join3(reader, connect_serial)
+        .join(connect_serial)
         .then(|_| Result::<_, ()>::Ok(()));
     let mut runtime = current_thread::Runtime::new().unwrap();
     runtime.block_on(task).unwrap();
