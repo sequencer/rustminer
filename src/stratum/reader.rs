@@ -6,27 +6,22 @@ pub struct Reader;
 impl Reader {
     pub fn create(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send {
         let xnonce = pool.xnonce.clone();
-        let works = pool.works.clone();
+        let work_sender = pool.work_channel.0.clone();
         let has_new_work = pool.has_new_work.clone();
         let vermask = pool.vermask.clone();
         let diff = pool.diff.clone();
         pool.receiver()
             .for_each(move |line| {
                 dbg!(&line);
+                let work_sender = work_sender.clone();
                 if let Ok(s) = serde_json::from_str::<Action>(&line) {
                     match s.params {
                         Params::Work(w) => {
-                            let mut works = works.lock().unwrap();
                             if w.clean {
-                                works.0.clear();
+                                // TODO
                             }
-                            works.0.push_back(w);
-
+                            tokio::spawn(work_sender.send(w).then(|_| Ok(())));
                             *has_new_work.lock().unwrap() = Some(());
-                            if let Some(t) = &works.1 {
-                                t.notify();
-                            }
-
                             println!("=> received new work!");
                         }
                         Params::Num([n]) => {

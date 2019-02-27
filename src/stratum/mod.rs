@@ -1,12 +1,9 @@
-use std::collections::VecDeque;
-use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use bytes::Bytes;
 use futures::stream::Stream;
-use futures::task::Task;
-use futures::{Async, Future, Poll};
+use futures::{Future, Poll};
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
@@ -23,39 +20,15 @@ pub use self::reader::Reader;
 use super::work::*;
 use crate::util::SinkHook;
 
-#[derive(Debug, Default)]
-pub struct WorkDeque(VecDeque<Work>);
-
-impl Deref for WorkDeque {
-    type Target = VecDeque<Work>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for WorkDeque {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 #[derive(Debug)]
-pub struct WorkStream(pub Arc<Mutex<(WorkDeque, Option<Task>)>>);
+pub struct WorkStream(pub Receiver<Work>);
 
 impl Stream for WorkStream {
     type Item = Work;
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let mut works = self.0.lock().unwrap();
-        match works.0.pop_front() {
-            Some(w) => Ok(Async::Ready(Some(w))),
-            None => {
-                works.1 = Some(futures::task::current());
-                Ok(Async::NotReady)
-            }
-        }
+        self.0.poll().map_err(|_| ())
     }
 }
 
@@ -65,7 +38,7 @@ pub struct Pool {
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
-    pub works: Arc<Mutex<(WorkDeque, Option<Task>)>>,
+    pub work_channel: (Sender<Work>, Receiver<Work>),
     pub has_new_work: Arc<Mutex<Option<()>>>,
     pub vermask: Arc<Mutex<Option<Bytes>>>,
     pub diff: Arc<Mutex<f64>>,
@@ -80,7 +53,7 @@ impl Pool {
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
-            works: Arc::new(Mutex::new((WorkDeque::default(), None))),
+            work_channel: channel(8),
             has_new_work: Arc::new(Mutex::new(None)),
             vermask: Arc::new(Mutex::new(None)),
             diff: Arc::new(Mutex::new(1.0)),

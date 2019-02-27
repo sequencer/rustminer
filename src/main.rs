@@ -27,7 +27,7 @@ fn main() {
 
     let pool_sender = pool.sender();
 
-    let ws = WorkStream(pool.works.clone());
+    let ws = WorkStream(pool.work_channel.1);
     let xnonce = pool.xnonce.clone();
     let has_new_work = pool.has_new_work.clone();
     let serial = serial::new("/dev/ttyS1");
