@@ -35,6 +35,7 @@ impl Stream for WorkStream {
 pub struct Pool {
     addr: String,
     pub counter: Arc<Mutex<u32>>,
+    tcpstream: Option<std::net::TcpStream>,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
@@ -50,6 +51,7 @@ impl Pool {
         Self {
             addr: String::from(addr),
             counter: Arc::new(Mutex::new(0)),
+            tcpstream: None,
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
@@ -74,8 +76,12 @@ impl Pool {
         let (writer_tx, writer_rx) = channel::<String>(4096);
         self.writer = Some(writer_tx);
 
-        let tcpstream = std::net::TcpStream::connect(&self.addr).unwrap();
-        let tcpstream = TcpStream::from_std(tcpstream, &Handle::default()).unwrap();
+        self.tcpstream = Some(std::net::TcpStream::connect(&self.addr).unwrap());
+        let tcpstream = TcpStream::from_std(
+            self.tcpstream.as_ref().unwrap().try_clone().unwrap(),
+            &Handle::default(),
+        )
+        .unwrap();
         let (sink, stream) = LinesCodec::new().framed(tcpstream).split();
 
         let last_active = self.last_active.clone();

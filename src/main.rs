@@ -14,7 +14,7 @@ use self::stratum::*;
 use self::util::{serial, ToHex};
 use self::work::*;
 
-fn main() {
+fn main_loop() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
 
     let connect_pool = pool.connect();
@@ -92,4 +92,10 @@ fn main() {
         .then(|_| Result::<_, ()>::Ok(()));
     let mut runtime = current_thread::Runtime::new().unwrap();
     runtime.block_on(task).unwrap();
+}
+
+fn main() {
+    loop {
+        main_loop();
+    }
 }
