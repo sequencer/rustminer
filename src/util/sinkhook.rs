@@ -1,4 +1,4 @@
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures::{Async, AsyncSink, Poll, Sink, StartSend};
 
 #[derive(Clone, Debug)]
 #[must_use = "sinks do nothing unless polled"]
@@ -42,14 +42,5 @@ impl<S: Sink, F: Fn()> Sink for SinkHook<S, F> {
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
         self.sink.close()
-    }
-}
-
-impl<S: Stream, F> Stream for SinkHook<S, F> {
-    type Item = S::Item;
-    type Error = S::Error;
-
-    fn poll(&mut self) -> Poll<Option<S::Item>, S::Error> {
-        self.sink.poll()
     }
 }
