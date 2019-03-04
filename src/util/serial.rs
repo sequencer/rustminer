@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 use std::path::Path;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use crc::CrcAlgo;
+use crc_all::CrcAlgo;
 use lazy_static::lazy_static;
 use tokio::io;
 use tokio_codec::{Decoder, Encoder, Framed};
