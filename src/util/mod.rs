@@ -4,6 +4,7 @@ use bytes::{Bytes, BytesMut};
 use sha256::Sha256;
 
 pub mod hex;
+pub mod mmap;
 pub mod serial;
 mod sinkhook;
 

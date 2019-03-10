@@ -1,0 +1,71 @@
+use std::fs::OpenOptions;
+use std::ops::{Index, IndexMut, Range};
+use std::os::unix::io::AsRawFd;
+use std::path::Path;
+
+use libc::{off_t, size_t};
+
+pub struct Mmap {
+    ptr: *mut u8,
+    size: size_t,
+}
+
+impl Mmap {
+    pub fn new<T: AsRef<Path>>(path: T, size: size_t, offset: off_t) -> Self {
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect(&format!("can't open {}", path.as_ref().display()));
+
+        let ptr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                f.as_raw_fd(),
+                offset,
+            )
+        } as *mut u8;
+        Self { size, ptr }
+    }
+}
+
+impl Index<usize> for Mmap {
+    type Output = u8;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < self.size);
+        unsafe { &*self.ptr.add(index) }
+    }
+}
+
+impl Index<Range<usize>> for Mmap {
+    type Output = [u8];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        assert!(index.start <= index.end);
+        assert!(index.end < self.size);
+        let ptr = unsafe { self.ptr.add(index.start) };
+        let len = index.end - index.start;
+        unsafe { core::slice::from_raw_parts(ptr, len) }
+    }
+}
+
+impl IndexMut<usize> for Mmap {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        assert!(index < self.size);
+        unsafe { &mut *self.ptr.add(index) }
+    }
+}
+
+impl IndexMut<Range<usize>> for Mmap {
+    fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
+        assert!(index.start <= index.end);
+        assert!(index.end < self.size);
+        let ptr = unsafe { self.ptr.add(index.start) };
+        let len = index.end - index.start;
+        unsafe { core::slice::from_raw_parts_mut(ptr, len) }
+    }
+}

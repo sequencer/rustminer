@@ -7,7 +7,7 @@ use tokio::runtime::current_thread;
 use tokio_serial::SerialPort;
 
 pub mod stratum;
-mod util;
+pub mod util;
 pub mod work;
 
 use self::stratum::*;
