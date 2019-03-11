@@ -33,11 +33,10 @@ impl Mmap {
 
     pub fn write<T: AsRef<[u8]>>(&mut self, offset: usize, data: T) {
         let data = data.as_ref();
-        let mmap_ptr = self.ptr();
         assert!(offset + data.len() < self.size());
         for i in 0..data.len() {
             unsafe {
-                mmap_ptr.add(offset + i).write_volatile(data[i])
+                self.ptr.add(offset + i).write_volatile(data[i])
             }
         }
     }

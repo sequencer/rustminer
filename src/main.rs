@@ -41,28 +41,26 @@ fn main_loop() {
     let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
 
-    let connect_fpga = {
-        let send_to_fpga = ws
-            .map(move |w| {
-                Subwork2Maker::new(
-                    w,
-                    &xnonce.lock().unwrap(),
-                    vermask.lock().unwrap().unwrap(),
-                    has_new_work.clone(),
-                )
-            })
-            .flatten()
-            .for_each(move |sw| {
-                dbg!(sw);
-                thread::sleep(Duration::from_micros(1000));
-                Ok(())
-            });
-
-        thread::spawn(move || {
-            let mut runtime = current_thread::Runtime::new().unwrap();
-            runtime.block_on(send_to_fpga).unwrap();
+    let send_to_fpga = ws
+        .map(move |w| {
+            Subwork2Maker::new(
+                w,
+                &xnonce.lock().unwrap(),
+                vermask.lock().unwrap().unwrap(),
+                has_new_work.clone(),
+            )
+        })
+        .flatten()
+        .for_each(move |sw| {
+            dbg!(sw);
+            thread::sleep(Duration::from_micros(1000));
+            Ok(())
         });
-    };
+
+    thread::spawn(move || {
+        let mut runtime = current_thread::Runtime::new().unwrap();
+        runtime.block_on(send_to_fpga).unwrap();
+    });
 
     let mut runtime = current_thread::Runtime::new().unwrap();
     runtime.block_on(connect_pool).unwrap();
