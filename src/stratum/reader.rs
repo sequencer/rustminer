@@ -30,6 +30,14 @@ impl Reader {
                                 *diff.lock().unwrap() = n;
                             }
                         }
+                        Params::TMask(tmask) => {
+                            if s.method.as_str() == "mining.set_version_mask" {
+                                let mut vermask = vermask.lock().unwrap();
+                                let mask = tmask.0[0];
+                                *vermask = Some(mask);
+                                println!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
+                            }
+                        }
                         _ => println!("=> {}: {:?}", s.method, s.params),
                     }
                 } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
@@ -66,7 +74,10 @@ impl Reader {
                                             hex_to::u32(r.get("version-rolling.mask").unwrap())
                                                 .unwrap();
                                         *vermask = Some(mask);
-                                        println!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
+                                        println!(
+                                            "=> set vermask: 0x{}!",
+                                            mask.to_be_bytes().to_hex()
+                                        );
                                     } else {
                                         println!("=> the pool does not support version-rolling!");
                                     }

@@ -11,9 +11,9 @@ pub mod util;
 pub mod work;
 
 use self::stratum::*;
+use self::util::mmap::Mmap;
 use self::util::{fpga, ToHex};
 use self::work::*;
-use crate::util::mmap::Mmap;
 
 fn main_loop() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
@@ -23,11 +23,14 @@ fn main_loop() {
     let checker = checker::new(&mut pool);
     let connect_pool = connect_pool.join3(reader, checker);
 
-    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
+    let exts = vec![
+        "minimum-difficulty".to_string(),
+        "version-rolling".to_string(),
+    ];
     let ext_params = json!({
-            "version-rolling.mask": "1fffe000",
-            "version-rolling.min-bit-count": 2
-        });
+        "version-rolling.mask": "1fffe000",
+        "version-rolling.min-bit-count": 2
+    });
 
     // mining.configure
     pool.configure(exts, ext_params);
@@ -41,7 +44,9 @@ fn main_loop() {
     let xnonce = pool.xnonce.clone();
     let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
-    let mut fpga_writer = fpga::Writer{mmap: Mmap::new("/dev/uio0", 80, 0)};
+    let mut fpga_writer = fpga::Writer {
+        mmap: Mmap::new("/dev/uio0", 80, 0),
+    };
 
     let send_to_fpga = ws
         .map(move |w| {

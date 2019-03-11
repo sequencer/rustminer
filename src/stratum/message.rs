@@ -34,7 +34,7 @@ pub enum Params {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct TMask(#[serde(deserialize_with = "hex_to::bytes_vec")] Vec<Bytes>);
+pub struct TMask(#[serde(deserialize_with = "hex_to::u32_vec")] pub Vec<u32>);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config(pub Vec<String>, pub serde_json::Value);

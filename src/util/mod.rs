@@ -73,4 +73,13 @@ pub mod hex_to {
         let s: &str = Deserialize::deserialize(deserializer)?;
         Ok(u32::from_str_radix(s, 16).map_err(de::Error::custom)?)
     }
+
+    pub fn u32_vec<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u32>, D::Error> {
+        let sv: Vec<&str> = Deserialize::deserialize(deserializer)?;
+        let mut uv: Vec<u32> = Vec::with_capacity(sv.len());
+        for s in sv {
+            uv.push(u32::from_str_radix(s, 16).map_err(de::Error::custom)?);
+        }
+        Ok(uv)
+    }
 }

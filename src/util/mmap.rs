@@ -36,9 +36,7 @@ impl Mmap {
         let data = data.as_ref();
         assert!(offset + data.len() <= self.size());
         for i in 0..data.len() {
-            unsafe {
-                self.ptr.add(offset + i).write_volatile(data[i])
-            }
+            unsafe { self.ptr.add(offset + i).write_volatile(data[i]) }
         }
     }
 
