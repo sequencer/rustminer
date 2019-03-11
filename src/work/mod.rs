@@ -73,7 +73,9 @@ impl Work {
             prevhash: self.prevhash.clone(),
             merkle_root: self.merkle_root(&xnonce),
             ntime: self.ntime.clone(),
+            nbits: self.nbits.clone(),
             xnonce2: xnonce.1,
+            version: self.version,
             vermask,
         }
     }

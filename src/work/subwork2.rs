@@ -16,7 +16,9 @@ pub struct Subwork2 {
     pub prevhash: Bytes,
     pub merkle_root: Bytes,
     pub ntime: Bytes,
+    pub nbits: Bytes,
     pub xnonce2: Bytes,
+    pub version: u32,
     pub vermask: u32,
 }
 
