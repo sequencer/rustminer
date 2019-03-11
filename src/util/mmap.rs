@@ -5,6 +5,7 @@ use std::path::Path;
 
 use libc::{off_t, size_t};
 
+#[derive(Debug)]
 pub struct Mmap {
     ptr: *mut u8,
     size: size_t,
@@ -33,7 +34,7 @@ impl Mmap {
 
     pub fn write<T: AsRef<[u8]>>(&mut self, offset: usize, data: T) {
         let data = data.as_ref();
-        assert!(offset + data.len() < self.size());
+        assert!(offset + data.len() <= self.size());
         for i in 0..data.len() {
             unsafe {
                 self.ptr.add(offset + i).write_volatile(data[i])
@@ -87,3 +88,5 @@ impl IndexMut<Range<usize>> for Mmap {
         unsafe { core::slice::from_raw_parts_mut(ptr, len) }
     }
 }
+
+unsafe impl Send for Mmap {}

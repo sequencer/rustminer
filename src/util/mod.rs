@@ -3,6 +3,7 @@ use std::iter::FromIterator;
 use bytes::{Bytes, BytesMut};
 use sha256::Sha256;
 
+pub mod fpga;
 pub mod hex;
 pub mod mmap;
 pub mod serial;

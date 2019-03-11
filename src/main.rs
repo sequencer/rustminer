@@ -11,8 +11,9 @@ pub mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::ToHex;
+use self::util::{fpga, ToHex};
 use self::work::*;
+use crate::util::mmap::Mmap;
 
 fn main_loop() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
@@ -40,6 +41,7 @@ fn main_loop() {
     let xnonce = pool.xnonce.clone();
     let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
+    let mut fpga_writer = fpga::Writer{mmap: Mmap::new("/dev/uio0", 80, 0)};
 
     let send_to_fpga = ws
         .map(move |w| {
@@ -51,9 +53,10 @@ fn main_loop() {
             )
         })
         .flatten()
-        .for_each(move |sw| {
-            dbg!(sw);
-            thread::sleep(Duration::from_micros(1000));
+        .for_each(move |sw2| {
+            dbg!(&sw2);
+            fpga_writer.writer_subwork2(sw2);
+            thread::sleep(Duration::from_secs(1));
             Ok(())
         });
 
