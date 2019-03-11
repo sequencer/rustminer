@@ -30,6 +30,25 @@ impl Mmap {
         } as *mut u8;
         Self { size, ptr }
     }
+
+    pub fn write<T: AsRef<[u8]>>(&mut self, offset: usize, data: T) {
+        let data = data.as_ref();
+        let mmap_ptr = self.ptr();
+        assert!(offset + data.len() < self.size());
+        for i in 0..data.len() {
+            unsafe {
+                mmap_ptr.add(offset + i).write_volatile(data[i])
+            }
+        }
+    }
+
+    pub fn ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+
+    pub fn size(&self) -> size_t {
+        self.size
+    }
 }
 
 impl Index<usize> for Mmap {

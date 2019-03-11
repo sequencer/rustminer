@@ -2,16 +2,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use serde_json::json;
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
-use tokio_serial::SerialPort;
 
 pub mod stratum;
 pub mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::{serial, ToHex};
+use self::util::ToHex;
 use self::work::*;
 
 fn main_loop() {
@@ -22,6 +22,15 @@ fn main_loop() {
     let checker = checker::new(&mut pool);
     let connect_pool = connect_pool.join3(reader, checker);
 
+    let exts = vec!["minimum-difficulty".to_string(), "version-rolling".to_string()];
+    let ext_params = json!({
+            "version-rolling.mask": "1fffe000",
+            "version-rolling.min-bit-count": 2
+        });
+
+    // mining.configure
+    pool.configure(exts, ext_params);
+
     pool.subscribe();
     pool.authorize("h723n8m.001", "");
 
@@ -29,69 +38,34 @@ fn main_loop() {
 
     let ws = WorkStream(pool.work_channel.1);
     let xnonce = pool.xnonce.clone();
+    let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
-    let serial = serial::new("/dev/ttyS1");
-    let serial_cloned = serial.try_clone().unwrap();
-    let (sink, stream) = serial::framed(serial).split();
-    let sink = Arc::new(Mutex::new(sink));
 
-    let connect_serial = {
-        let pool_diff = pool.diff.clone();
-        let receive_from_asic = stream
-            .for_each(move |sw| {
-                let diff = Subwork::target_diff(&sw.1);
-                let pool_diff = pool_diff.lock().unwrap();
-                let pool_sender = pool_sender.clone();
-                if diff >= *pool_diff {
-                    let params = sw.0.into_params("h723n8m.001", &sw.2);
-                    let msg = Action {
-                        id: Some(4),
-                        method: String::from("mining.submit"),
-                        params,
-                    };
-                    let data = msg.to_string().unwrap();
-                    tokio::spawn(pool_sender.send(data).then(|_| Ok(())));
-                    println!("submit nonce: 0x{} (difficulty: {})", sw.1.to_hex(), diff);
-                } else {
-                    eprintln!(
-                        "nonce difficulty {} is too low, require {}!",
-                        diff, *pool_diff
-                    );
-                }
-                Ok(())
-            })
-            .map_err(|e| eprintln!("{}", e));
-
-        let send_to_asic = ws
+    let connect_fpga = {
+        let send_to_fpga = ws
             .map(move |w| {
-                SubworkMaker::new(
+                Subwork2Maker::new(
                     w,
                     &xnonce.lock().unwrap(),
+                    vermask.lock().unwrap().unwrap(),
                     has_new_work.clone(),
-                    serial_cloned.try_clone().unwrap(),
                 )
             })
             .flatten()
             .for_each(move |sw| {
-                let mut sink = sink.lock().unwrap();
-                sink.start_send(sw).unwrap();
-                sink.poll_complete().unwrap();
+                dbg!(sw);
                 thread::sleep(Duration::from_micros(1000));
                 Ok(())
             });
 
         thread::spawn(move || {
             let mut runtime = current_thread::Runtime::new().unwrap();
-            runtime.block_on(send_to_asic).unwrap();
+            runtime.block_on(send_to_fpga).unwrap();
         });
-        receive_from_asic
     };
 
-    let task = connect_pool
-        .join(connect_serial)
-        .then(|_| Result::<_, ()>::Ok(()));
     let mut runtime = current_thread::Runtime::new().unwrap();
-    runtime.block_on(task).unwrap();
+    runtime.block_on(connect_pool).unwrap();
 }
 
 fn main() {

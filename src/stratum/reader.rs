@@ -63,10 +63,10 @@ impl Reader {
                                     if *result {
                                         let mut vermask = vermask.lock().unwrap();
                                         let mask =
-                                            hex_to::bytes(r.get("version-rolling.mask").unwrap())
+                                            hex_to::u32(r.get("version-rolling.mask").unwrap())
                                                 .unwrap();
                                         *vermask = Some(mask);
-                                        println!("=> set vermask: {:?}!", *vermask);
+                                        println!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
                                     } else {
                                         println!("=> the pool does not support version-rolling!");
                                     }

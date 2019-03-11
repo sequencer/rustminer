@@ -41,7 +41,7 @@ pub struct Pool {
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub work_channel: (Sender<Work>, Receiver<Work>),
     pub has_new_work: Arc<Mutex<Option<()>>>,
-    pub vermask: Arc<Mutex<Option<Bytes>>>,
+    pub vermask: Arc<Mutex<Option<u32>>>,
     pub diff: Arc<Mutex<f64>>,
     pub last_active: Arc<Mutex<Result<Instant, io::Error>>>,
 }
@@ -137,6 +137,16 @@ impl Pool {
             method: String::from("mining.authorize"),
             params: Params::User([String::from(user), String::from(pass)]),
         };
+        let _ = self.send(&msg).wait();
+    }
+
+    pub fn configure(&mut self, exts: Vec<String>, ext_params: serde_json::Value) {
+        let msg = Action {
+            id: Some(1),
+            method: String::from("mining.configure"),
+            params: Params::Config(Config(exts, ext_params)),
+        };
+
         let _ = self.send(&msg).wait();
     }
 }

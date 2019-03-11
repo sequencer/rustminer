@@ -3,10 +3,12 @@ use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 mod subwork;
+mod subwork2;
 #[cfg(test)]
 mod tests;
 
 pub use self::subwork::*;
+pub use self::subwork2::*;
 use super::util::*;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -62,6 +64,17 @@ impl Work {
             data2: Bytes::from(&block_header[64..]),
             block_header,
             xnonce2: xnonce.1,
+        }
+    }
+
+    pub fn subwork2(&self, xnonce: (&Bytes, Bytes), vermask: u32) -> Subwork2 {
+        Subwork2 {
+            workid: self.id.clone(),
+            prevhash: self.prevhash.clone(),
+            merkle_root: self.merkle_root(&xnonce),
+            ntime: self.ntime.clone(),
+            xnonce2: xnonce.1,
+            vermask,
         }
     }
 }

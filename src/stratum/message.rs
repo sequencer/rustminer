@@ -29,6 +29,7 @@ pub enum Params {
     User([String; 2]),
     Config(Config),
     Submit([String; 5]),
+    Submit2([String; 6]),
     None(Vec<()>),
 }
 
