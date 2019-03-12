@@ -11,6 +11,13 @@ pub struct Mmap {
     size: size_t,
 }
 
+pub struct ReadMmap<'a> {
+    mmap: &'a mut Mmap,
+    offset: usize,
+    size: usize,
+    counter: usize,
+}
+
 impl Mmap {
     pub fn new<T: AsRef<Path>>(path: T, size: size_t, offset: off_t) -> Self {
         let f = OpenOptions::new()
@@ -40,12 +47,46 @@ impl Mmap {
         }
     }
 
+    pub fn read(&mut self, offset: usize, size: usize) -> ReadMmap {
+        ReadMmap::new(self, offset, size)
+    }
+
     pub fn ptr(&self) -> *mut u8 {
         self.ptr
     }
 
     pub fn size(&self) -> size_t {
         self.size
+    }
+}
+
+impl<'a> ReadMmap<'a> {
+    pub fn new(mmap: &'a mut Mmap, offset: usize, size: usize) -> Self {
+        Self {
+            mmap,
+            offset,
+            size,
+            counter: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for ReadMmap<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.counter >= self.size {
+            None
+        } else {
+            let value = unsafe {
+                self.mmap
+                    .ptr
+                    .add(self.offset + self.counter)
+                    .read_volatile()
+            };
+            self.counter += 1;
+            Some(value)
+        }
     }
 }
 

@@ -1,7 +1,13 @@
+use bytes::Bytes;
+
 use super::Mmap;
 use crate::work::Subwork2;
 
 pub struct Writer {
+    pub mmap: Mmap,
+}
+
+pub struct Reader {
     pub mmap: Mmap,
 }
 
@@ -46,5 +52,13 @@ impl Writer {
             SerialMode::Direct => self.set_csr(0, false),
             SerialMode::Mining => self.set_csr(0, true),
         }
+    }
+}
+
+impl Reader {
+    pub fn read_nonce(&mut self) -> Bytes {
+        let mut nonce = Bytes::with_capacity(7);
+        nonce.extend(self.mmap.read(0, 7));
+        nonce
     }
 }
