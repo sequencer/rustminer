@@ -1,8 +1,13 @@
-use super::mmap::*;
+use super::Mmap;
 use crate::work::Subwork2;
 
 pub struct Writer {
     pub mmap: Mmap,
+}
+
+pub enum SerialMode {
+    Direct,
+    Mining,
 }
 
 impl Writer {
@@ -17,5 +22,29 @@ impl Writer {
         self.mmap.write(72, sw2.ntime);
         assert_eq!(sw2.nbits.len(), 4);
         self.mmap.write(76, sw2.nbits);
+    }
+
+    fn set_csr(&mut self, csr: usize, value: bool) {
+        assert!(csr < 16);
+        let ptr = unsafe { self.mmap.ptr().add(80) };
+        let data = unsafe { ptr.read_volatile() };
+        let value = if value {
+            data | 1 << csr
+        } else {
+            data & (0xff ^ 1 << csr)
+        };
+
+        if data != value {
+            unsafe {
+                ptr.write_volatile(value);
+            }
+        }
+    }
+
+    pub fn set_serial_mode(&mut self, mode: SerialMode) {
+        match mode {
+            SerialMode::Direct => self.set_csr(0, false),
+            SerialMode::Mining => self.set_csr(0, true),
+        }
     }
 }

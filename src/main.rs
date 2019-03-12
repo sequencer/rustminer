@@ -11,8 +11,7 @@ pub mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::mmap::Mmap;
-use self::util::{fpga, ToHex};
+use self::util::{fpga, Mmap, ToHex};
 use self::work::*;
 
 fn main_loop() {
@@ -45,8 +44,9 @@ fn main_loop() {
     let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
     let mut fpga_writer = fpga::Writer {
-        mmap: Mmap::new("/dev/uio0", 80, 0),
+        mmap: Mmap::new("/dev/uio0", 82, 0),
     };
+    fpga_writer.set_serial_mode(fpga::SerialMode::Mining);
 
     let send_to_fpga = ws
         .map(move |w| {

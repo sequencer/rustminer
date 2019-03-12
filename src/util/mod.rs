@@ -5,11 +5,12 @@ use sha256::Sha256;
 
 pub mod fpga;
 pub mod hex;
-pub mod mmap;
+mod mmap;
 pub mod serial;
 mod sinkhook;
 
 pub use self::hex::{FromHex, ToHex};
+pub use self::mmap::Mmap;
 pub use sinkhook::SinkHook;
 
 pub trait Flip32: Sized {
