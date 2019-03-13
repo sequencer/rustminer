@@ -39,23 +39,7 @@ impl Command {
     }
 }
 
-pub trait Downcast<T: 'static>: Any + Sized {
-    fn downcast_ref(&self) -> &T {
-        match Any::downcast_ref::<T>(self) {
-            Some(target) => target,
-            None => unreachable!(),
-        }
-    }
-
-    fn downcast_mut(&mut self) -> &mut T {
-        match Any::downcast_mut::<T>(self) {
-            Some(target) => target,
-            None => unreachable!(),
-        }
-    }
-}
-
-pub trait BoardConfig: Downcast<I2c<File>> {
+pub trait SendCommand: Any + Sized {
     fn send_command(
         &mut self,
         addr: u16,
@@ -97,9 +81,16 @@ pub trait BoardConfig: Downcast<I2c<File>> {
             }
         }
 
-        self.downcast_mut().i2c_transfer(&mut massages)
-    }
+        let i2c = match Any::downcast_mut::<I2c<File>>(self) {
+            Some(target) => target,
+            None => unreachable!(),
+        };
 
+        i2c.i2c_transfer(&mut massages)
+    }
+}
+
+pub trait BoardConfig: SendCommand {
     fn jump_to_app(&mut self, addr: u16) -> Result<()> {
         self.send_command(addr, JUMP_FROM_LOADER_TO_APP, None, false)
     }
@@ -128,6 +119,6 @@ pub trait BoardConfig: Downcast<I2c<File>> {
     }
 }
 
-impl<T: 'static> Downcast<T> for I2c<File> {}
+impl SendCommand for I2c<File> {}
 
 impl BoardConfig for I2c<File> {}
