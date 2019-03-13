@@ -2,7 +2,9 @@ use std::any::Any;
 use std::fs::File;
 use std::io::Result;
 
-use i2c_linux::{I2c, Message, ReadFlags, WriteFlags};
+use i2c_linux::{Message, ReadFlags, WriteFlags};
+
+type I2c = i2c_linux::I2c<File>;
 
 use self::Command::*;
 
@@ -33,12 +35,6 @@ pub enum Command {
     RD_TEMP_OFFSET_VALUE = 0x23,
 }
 
-impl Command {
-    fn value(self) -> u8 {
-        self as u8
-    }
-}
-
 pub trait SendCommand: Any + Sized {
     fn send_command(
         &mut self,
@@ -50,11 +46,11 @@ pub trait SendCommand: Any + Sized {
         let data_len = data.as_ref().map_or(0, |x| x.len());
         let mut massages = Vec::with_capacity(3 + data_len);
 
-        let command = [[0x55], [0xaa], [cmd.value()]];
-        for i in &command {
+        let command = [[0x55], [0xaa], [cmd as u8]];
+        for b in &command {
             massages.push(Message::Write {
                 address: addr,
-                data: i,
+                data: b,
                 flags: WriteFlags::default(),
             });
         }
@@ -81,12 +77,10 @@ pub trait SendCommand: Any + Sized {
             }
         }
 
-        let i2c = match Any::downcast_mut::<I2c<File>>(self) {
-            Some(target) => target,
+        match Any::downcast_mut::<I2c>(self) {
+            Some(i2c) => i2c.i2c_transfer(&mut massages),
             None => unreachable!(),
-        };
-
-        i2c.i2c_transfer(&mut massages)
+        }
     }
 }
 
@@ -119,6 +113,6 @@ pub trait BoardConfig: SendCommand {
     }
 }
 
-impl SendCommand for I2c<File> {}
+impl SendCommand for I2c {}
 
-impl BoardConfig for I2c<File> {}
+impl BoardConfig for I2c {}
