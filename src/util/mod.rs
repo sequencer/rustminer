@@ -5,6 +5,7 @@ use sha256::Sha256;
 
 pub mod fpga;
 pub mod hex;
+pub mod i2c;
 mod mmap;
 pub mod serial;
 mod sinkhook;
