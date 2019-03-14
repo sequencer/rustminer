@@ -78,7 +78,7 @@ pub trait SendCommand: Any + Sized {
                     massages.push(Message::Write {
                         address: addr,
                         // write data byte by byte
-                        data: &data[i..i],
+                        data: &data[i..=i],
                         flags: WriteFlags::default(),
                     })
                 }
