@@ -1,10 +1,11 @@
 use std::any::Any;
 use std::fs::File;
 use std::io::Result;
+use std::path::Path;
 
 use i2c_linux::{Message, ReadFlags, WriteFlags};
 
-type I2c = i2c_linux::I2c<File>;
+pub type I2c = i2c_linux::I2c<File>;
 
 use self::Command::*;
 
@@ -33,6 +34,13 @@ pub enum Command {
     GET_MAC = 0x21,
     WR_TEMP_OFFSET_VALUE = 0x22,
     RD_TEMP_OFFSET_VALUE = 0x23,
+}
+
+pub fn open<T: AsRef<Path>>(path: T) -> I2c {
+    let device = File::open(&path)
+        .unwrap_or_else(|_| panic!(format!("can't open {} !", path.as_ref().display())));
+
+    I2c::new(device)
 }
 
 pub trait SendCommand: Any + Sized {
@@ -111,6 +119,52 @@ pub trait BoardConfig: SendCommand {
 
     fn reset_pic(&mut self, addr: u16) -> Result<()> {
         self.send_command(addr, RESET_PIC, None, false)
+    }
+
+    fn get_software_version(&mut self, addr: u16) -> Result<u8> {
+        let mut ver = [0];
+        self.send_command(addr, GET_PIC_SOFTWARE_VERSION, Some(&mut ver), true)?;
+        Ok(ver[0])
+    }
+
+    fn set_flash_pointer(&mut self, addr: u16, fptr: u16) -> Result<()> {
+        self.send_command(
+            addr,
+            SET_PIC_FLASH_POINTER,
+            Some(&mut fptr.to_be_bytes()),
+            false,
+        )
+    }
+
+    fn get_flash_pointer(&mut self, addr: u16) -> Result<u16> {
+        let mut fptr = [0; 2];
+        self.send_command(addr, GET_PIC_FLASH_POINTER, Some(&mut fptr), true)?;
+        Ok(u16::from_be_bytes(fptr))
+    }
+
+    fn read_data_from_flash(&mut self, addr: u16) -> Result<[u8; 16]> {
+        let mut data = [0; 16];
+        self.send_command(addr, READ_DATA_FROM_IIC, Some(&mut data), true)?;
+        Ok(data)
+    }
+
+    fn send_heart_beat(&mut self, addr: u16) -> Result<()> {
+        self.send_command(addr, SEND_HEART_BEAT, None, false)
+    }
+
+    fn get_temp_offset(&mut self, addr: u16) -> Result<u64> {
+        let mut offset = [0; 8];
+        self.send_command(addr, RD_TEMP_OFFSET_VALUE, Some(&mut offset), true)?;
+        Ok(u64::from_be_bytes(offset))
+    }
+
+    fn set_temp_offset(&mut self, addr: u16, offset: u64) -> Result<()> {
+        self.send_command(
+            addr,
+            WR_TEMP_OFFSET_VALUE,
+            Some(&mut offset.to_be_bytes()),
+            false,
+        )
     }
 }
 
