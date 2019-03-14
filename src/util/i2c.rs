@@ -84,20 +84,21 @@ pub trait SendCommand: Any + Sized {
     }
 }
 
+#[allow(clippy::unreadable_literal)]
 pub trait BoardConfig: SendCommand {
     fn jump_to_app(&mut self, addr: u16) -> Result<()> {
         self.send_command(addr, JUMP_FROM_LOADER_TO_APP, None, false)
     }
 
-    fn set_voltage(&mut self, addr: u16, vol: f32) -> Result<()> {
+    fn set_voltage(&mut self, addr: u16, vol: f64) -> Result<()> {
         let vol = (1608.420446 - 170.423497 * vol) as u8;
         self.send_command(addr, SET_VOLTAGE, Some(&mut [vol]), false)
     }
 
-    fn get_voltage(&mut self, addr: u16) -> Result<f32> {
+    fn get_voltage(&mut self, addr: u16) -> Result<f64> {
         let mut vol = [0];
         self.send_command(addr, GET_VOLTAGE, Some(&mut vol), true)?;
-        Ok((1608.420446 - vol[0] as f32) / 170.423497)
+        Ok((1608.420446 - f64::from(vol[0])) / 170.423497)
     }
 
     fn enable_voltage(&mut self, addr: u16) -> Result<()> {

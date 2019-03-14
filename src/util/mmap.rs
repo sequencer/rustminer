@@ -24,7 +24,7 @@ impl Mmap {
             .read(true)
             .write(true)
             .open(&path)
-            .expect(&format!("can't open {}", path.as_ref().display()));
+            .unwrap_or_else(|_| panic!("can't open {} !", path.as_ref().display()));
 
         let ptr = unsafe {
             libc::mmap(
@@ -42,8 +42,8 @@ impl Mmap {
     pub fn write<T: AsRef<[u8]>>(&mut self, offset: usize, data: T) {
         let data = data.as_ref();
         assert!(offset + data.len() <= self.size());
-        for i in 0..data.len() {
-            unsafe { self.ptr.add(offset + i).write_volatile(data[i]) }
+        for (i, v) in data.iter().enumerate() {
+            unsafe { self.ptr.add(offset + i).write_volatile(*v) }
         }
     }
 
