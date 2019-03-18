@@ -1,4 +1,12 @@
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
+use std::sync::{Arc, Mutex};
+use std::thread;
+
 use bytes::Bytes;
+use futures::future::Future;
+use futures::sink::Sink;
+use tokio::sync::mpsc::{channel, Receiver};
 
 use super::Mmap;
 use crate::work::Subwork2;
@@ -8,12 +16,23 @@ pub struct Writer {
 }
 
 pub struct Reader {
-    pub mmap: Mmap,
+    pub mmap: Arc<Mutex<Mmap>>,
 }
 
 pub enum SerialMode {
     Direct,
     Mining,
+}
+
+pub fn new() -> (Writer, Reader) {
+    let mmap = Mmap::new("/dev/uio0", 91, 0);
+    let writer = Writer {
+        mmap: mmap.reduce(82),
+    };
+    let reader = Reader {
+        mmap: Arc::new(Mutex::new(mmap.offset(0x54))),
+    };
+    (writer, reader)
 }
 
 impl Writer {
@@ -56,9 +75,31 @@ impl Writer {
 }
 
 impl Reader {
-    pub fn read_nonce(&mut self) -> Bytes {
-        let mut nonce = Bytes::with_capacity(7);
-        nonce.extend(self.mmap.read(0, 7));
-        nonce
+    pub fn receive_nonce(&mut self) -> Receiver<Bytes> {
+        let (sender, receiver) = channel(32);
+        let mmap = self.mmap.clone();
+
+        const ENABLE_INTERRUPT: [u8; 4] = 1u32.to_ne_bytes();
+
+        let reader = move || {
+            let mut uio = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open("/dev/uio0")
+                .expect("can't open /dev/uio0 !");
+            let mut buf = [0; 4];
+            uio.write_all(&ENABLE_INTERRUPT).unwrap();
+
+            while uio.read(&mut buf).unwrap() == 4 {
+                let mut nonce = Bytes::with_capacity(7);
+                nonce.extend(mmap.lock().unwrap().read(0, 7));
+
+                sender.clone().send(nonce).wait().unwrap();
+                uio.write_all(&ENABLE_INTERRUPT).unwrap();
+            }
+        };
+        thread::spawn(move || reader());
+
+        receiver
     }
 }

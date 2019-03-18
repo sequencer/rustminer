@@ -1,3 +1,5 @@
+#![feature(const_int_conversion)]
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -44,9 +46,7 @@ fn main_loop() {
     let xnonce = pool.xnonce.clone();
     let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
-    let mut fpga_writer = fpga::Writer {
-        mmap: Mmap::new("/dev/uio0", 82, 0),
-    };
+    let (mut fpga_writer, mut fpga_reader) = fpga::new();
     fpga_writer.set_serial_mode(fpga::SerialMode::Mining);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
@@ -79,8 +79,18 @@ fn main_loop() {
 
     let send_to_board = send_heart_beat.join(send_to_fpga);
 
+    let print_nonce = fpga_reader
+        .receive_nonce()
+        .for_each(|nonce| {
+            println!("received nonce: {}", nonce.to_hex());
+            Ok(())
+        })
+        .map_err(|_| ());
+
     let mut runtime = current_thread::Runtime::new().unwrap();
-    runtime.block_on(connect_pool.join(send_to_board)).unwrap();
+    runtime
+        .block_on(connect_pool.join(send_to_board).join(print_nonce))
+        .unwrap();
 }
 
 fn main() {

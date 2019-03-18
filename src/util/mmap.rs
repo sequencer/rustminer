@@ -51,6 +51,22 @@ impl Mmap {
         ReadMmap::new(self, offset, size)
     }
 
+    pub fn offset(&self, offset: usize) -> Self {
+        assert!(offset < self.size);
+        Self {
+            ptr: unsafe { self.ptr.add(offset) },
+            size: self.size - offset,
+        }
+    }
+
+    pub fn reduce(&self, size: usize) -> Self {
+        assert!(size < self.size);
+        Self {
+            ptr: self.ptr,
+            size,
+        }
+    }
+
     pub fn ptr(&self) -> *mut u8 {
         self.ptr
     }
