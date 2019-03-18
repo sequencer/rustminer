@@ -11,8 +11,10 @@ pub mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::{fpga, Mmap, ToHex};
+use self::util::{fpga, i2c, Mmap, ToHex};
 use self::work::*;
+use crate::util::i2c::BoardConfig;
+use tokio::timer::Interval;
 
 fn main_loop() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
@@ -65,13 +67,21 @@ fn main_loop() {
             Ok(())
         });
 
+    let mut i2c = i2c::open("/dev/i2c-0");
+    let addr = 0x55;
+    let send_heart_beat = Interval::new_interval(Duration::from_secs(10))
+        .map_err(|_| ())
+        .for_each(move |_| i2c.send_heart_beat(addr).map_err(|e| eprintln!("{}", e)));
+
     thread::spawn(move || {
         let mut runtime = current_thread::Runtime::new().unwrap();
         runtime.block_on(send_to_fpga).unwrap();
     });
 
     let mut runtime = current_thread::Runtime::new().unwrap();
-    runtime.block_on(connect_pool).unwrap();
+    runtime
+        .block_on(connect_pool.join(send_heart_beat))
+        .unwrap();
 }
 
 fn main() {
