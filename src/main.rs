@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tokio::prelude::*;
@@ -14,7 +13,7 @@ use self::stratum::*;
 use self::util::{fpga, i2c, Mmap, ToHex};
 use self::work::*;
 use crate::util::i2c::BoardConfig;
-use tokio::timer::Interval;
+use tokio::timer::{Delay, Interval};
 
 fn main_loop() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");
@@ -49,6 +48,7 @@ fn main_loop() {
         mmap: Mmap::new("/dev/uio0", 82, 0),
     };
     fpga_writer.set_serial_mode(fpga::SerialMode::Mining);
+    let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
     let send_to_fpga = ws
         .map(move |w| {
@@ -61,10 +61,14 @@ fn main_loop() {
         })
         .flatten()
         .for_each(move |sw2| {
-            dbg!(&sw2);
-            fpga_writer.writer_subwork2(sw2);
-            thread::sleep(Duration::from_secs(1));
-            Ok(())
+            let fpga_writer = fpga_writer.clone();
+            Delay::new(Instant::now() + Duration::from_secs(5))
+                .map_err(|_| ())
+                .and_then(move |_| {
+                    dbg!(&sw2);
+                    fpga_writer.lock().unwrap().writer_subwork2(sw2);
+                    Ok(())
+                })
         });
 
     let mut i2c = i2c::open("/dev/i2c-0");
@@ -73,15 +77,10 @@ fn main_loop() {
         .map_err(|_| ())
         .for_each(move |_| i2c.send_heart_beat(addr).map_err(|e| eprintln!("{}", e)));
 
-    thread::spawn(move || {
-        let mut runtime = current_thread::Runtime::new().unwrap();
-        runtime.block_on(send_to_fpga).unwrap();
-    });
+    let send_to_board = send_heart_beat.join(send_to_fpga);
 
     let mut runtime = current_thread::Runtime::new().unwrap();
-    runtime
-        .block_on(connect_pool.join(send_heart_beat))
-        .unwrap();
+    runtime.block_on(connect_pool.join(send_to_board)).unwrap();
 }
 
 fn main() {
