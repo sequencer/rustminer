@@ -6,16 +6,19 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
+use tokio::timer::{Delay, Interval};
 
 pub mod stratum;
 pub mod util;
 pub mod work;
 
 use self::stratum::*;
-use self::util::{fpga, i2c, Mmap, ToHex};
+use self::util::{
+    fpga,
+    i2c::{self, BoardConfig},
+    ToHex,
+};
 use self::work::*;
-use crate::util::i2c::BoardConfig;
-use tokio::timer::{Delay, Interval};
 
 fn main_loop() {
     let mut pool = Pool::new("cn.ss.btc.com:1800");

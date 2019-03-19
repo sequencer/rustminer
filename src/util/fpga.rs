@@ -12,11 +12,11 @@ use super::Mmap;
 use crate::work::Subwork2;
 
 pub struct Writer {
-    pub mmap: Mmap,
+    mmap: Mmap,
 }
 
 pub struct Reader {
-    pub mmap: Arc<Mutex<Mmap>>,
+    mmap: Arc<Mutex<Mmap>>,
 }
 
 pub enum SerialMode {
@@ -30,7 +30,7 @@ pub fn new() -> (Writer, Reader) {
         mmap: mmap.reduce(82),
     };
     let reader = Reader {
-        mmap: Arc::new(Mutex::new(mmap.offset(0x54))),
+        mmap: Arc::new(Mutex::new(mmap.offset(84))),
     };
     (writer, reader)
 }
