@@ -25,7 +25,7 @@ pub enum SerialMode {
 }
 
 pub fn new() -> (Writer, Reader) {
-    let mmap = Mmap::new("/dev/uio0", 91, 0);
+    let mmap = Mmap::new("/dev/uio0", 100, 0);
     let writer = Writer {
         mmap: mmap.reduce(82),
     };
@@ -47,6 +47,13 @@ impl Writer {
         self.mmap.write(72, sw2.ntime);
         assert_eq!(sw2.nbits.len(), 4);
         self.mmap.write(76, sw2.nbits);
+
+        // debug
+        print!("write work: ");
+        for b in self.mmap.read(0, 80) {
+            print!("{:02x}", b);
+        }
+        println!();
     }
 
     fn set_csr(&mut self, csr: usize, value: bool) {
@@ -91,8 +98,8 @@ impl Reader {
             uio.write_all(&ENABLE_INTERRUPT).unwrap();
 
             while uio.read(&mut buf).unwrap() == 4 {
-                let mut nonce = Bytes::with_capacity(7);
-                nonce.extend(mmap.lock().unwrap().read(0, 7));
+                let mut nonce = Bytes::with_capacity(12);
+                nonce.extend(mmap.lock().unwrap().read(0, 12));
 
                 sender.clone().send(nonce).wait().unwrap();
                 uio.write_all(&ENABLE_INTERRUPT).unwrap();
