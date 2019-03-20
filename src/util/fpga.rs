@@ -35,6 +35,27 @@ pub fn new() -> (Writer, Reader) {
     (writer, reader)
 }
 
+pub fn version_bits(mut version_mask: u32, mut version_count: u32) -> u32 {
+    let mut version_bits = 0;
+
+    let mut num = 0;
+    while version_mask != 0 {
+        let trailing_zeros = version_mask.trailing_zeros();
+        num += if trailing_zeros > 0 {
+            version_mask >>= trailing_zeros;
+            trailing_zeros
+        } else {
+            let trailing_ones = (!version_mask).trailing_zeros();
+            let mask = 0xffffffff >> (32 - trailing_ones);
+            version_bits |= (version_count & mask) << num;
+            version_count >>= trailing_ones;
+            version_mask >>= trailing_ones;
+            trailing_ones
+        };
+    }
+    version_bits
+}
+
 impl Writer {
     pub fn writer_subwork2(&mut self, sw2: Subwork2) {
         self.mmap.write(0, sw2.version.to_ne_bytes());
