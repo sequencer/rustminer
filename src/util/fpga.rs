@@ -5,8 +5,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use bytes::Bytes;
+use crc_all::CrcAlgo;
 use futures::future::Future;
 use futures::sink::Sink;
+use lazy_static::lazy_static;
 use tokio::sync::mpsc::{channel, Receiver};
 
 use super::Mmap;
@@ -36,6 +38,30 @@ pub fn new() -> (Writer, Reader) {
         mmap: Arc::new(Mutex::new(mmap.offset(84))),
     };
     (writer, reader)
+}
+
+pub fn crc5_false(data: &[u8], offset: usize) -> u8 {
+    assert!(offset < 8);
+    lazy_static! {
+        static ref CRC5: CrcAlgo<u8> = CrcAlgo::<u8>::new(0x05, 5, 0x1f, 0, false);
+    };
+    let crc = &mut 0u8;
+    CRC5.init_crc(crc);
+
+    if offset == 0 {
+        CRC5.update_crc(crc, data)
+    } else {
+        CRC5.update_crc(crc, &data[..data.len() - 1]);
+        *crc ^= data.last().unwrap() & (0xff << offset);
+        for _ in offset..8 {
+            if crc.leading_zeros() == 0 {
+                *crc = *crc << 1 ^ 0x28;
+            } else {
+                *crc <<= 1;
+            }
+        }
+        CRC5.finish_crc(crc)
+    }
 }
 
 pub fn version_bits(mut version_mask: u32, mut version_count: u32) -> u32 {
