@@ -2,10 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use futures::stream::Stream;
 use futures::{Async, Poll};
+use num_traits::cast::ToPrimitive;
 
 use super::*;
 use crate::stratum::Params;
 use crate::util::ToHex;
+use bytes::BytesMut;
 
 #[derive(Clone, Debug, Default)]
 pub struct Subwork2 {
@@ -20,6 +22,31 @@ pub struct Subwork2 {
 }
 
 impl Subwork2 {
+    pub fn block_header(&self, version_bits: u32) -> Bytes {
+        let mut header = Bytes::with_capacity(76);
+
+        let version = (self.version & !self.vermask) | version_bits;
+        header.extend(&version.to_be_bytes());
+        header.extend(&self.prevhash);
+        header.extend(&self.merkle_root);
+        header.extend(&self.ntime);
+        header.extend(&self.nbits);
+        header
+    }
+
+    pub fn target(&self, nonce: &Bytes, version_bits: u32) -> Bytes {
+        let mut target = BytesMut::with_capacity(32);
+        target.extend(&self.block_header(version_bits));
+        target.extend(nonce);
+        target = target.flip32().sha256d();
+        target.reverse();
+        target.freeze()
+    }
+
+    pub fn target_diff(target: &Bytes) -> f64 {
+        2.695_994_666_715_064e67 / BigUint::from_bytes_be(target).to_f64().unwrap()
+    }
+
     pub fn into_params(self, name: &str, nonce: &Bytes, version_bits: u32) -> Params {
         Params::Submit2([
             String::from(name),

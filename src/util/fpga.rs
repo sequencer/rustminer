@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -13,6 +14,7 @@ use crate::work::Subwork2;
 
 pub struct Writer {
     mmap: Mmap,
+    subworks: VecDeque<Subwork2>,
 }
 
 pub struct Reader {
@@ -28,6 +30,7 @@ pub fn new() -> (Writer, Reader) {
     let mmap = Mmap::new("/dev/uio0", 100, 0);
     let writer = Writer {
         mmap: mmap.reduce(82),
+        subworks: VecDeque::with_capacity(2),
     };
     let reader = Reader {
         mmap: Arc::new(Mutex::new(mmap.offset(84))),
@@ -62,13 +65,16 @@ impl Writer {
         self.mmap.write(0, sw2.version.to_be_bytes());
         self.mmap.write(4, sw2.vermask.to_be_bytes());
         assert_eq!(sw2.prevhash.len(), 32);
-        self.mmap.write(8, sw2.prevhash);
+        self.mmap.write(8, &sw2.prevhash);
         assert_eq!(sw2.merkle_root.len(), 32);
-        self.mmap.write(40, sw2.merkle_root);
+        self.mmap.write(40, &sw2.merkle_root);
         assert_eq!(sw2.ntime.len(), 4);
-        self.mmap.write(72, sw2.ntime);
+        self.mmap.write(72, &sw2.ntime);
         assert_eq!(sw2.nbits.len(), 4);
-        self.mmap.write(76, sw2.nbits);
+        self.mmap.write(76, &sw2.nbits);
+
+        self.subworks.push_front(sw2);
+        self.subworks.truncate(2);
 
         // debug
         print!("write work: ");
@@ -76,6 +82,10 @@ impl Writer {
             print!("{:02x}", b);
         }
         println!();
+    }
+
+    pub fn subworks(&self) -> Vec<Subwork2> {
+        self.subworks.iter().cloned().collect()
     }
 
     fn set_csr(&mut self, csr: usize, value: bool) {
@@ -98,7 +108,10 @@ impl Writer {
     pub fn set_serial_mode(&mut self, mode: SerialMode) {
         match mode {
             SerialMode::Direct => self.set_csr(0, false),
-            SerialMode::Mining => self.set_csr(0, true),
+            SerialMode::Mining => {
+                self.set_csr(0, true);
+                self.set_csr(2, true);
+            }
         }
     }
 }
