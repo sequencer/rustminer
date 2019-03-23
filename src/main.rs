@@ -94,7 +94,7 @@ fn main_loop() {
             let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
             let version_count =
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
-                    - (received[7] - received[5]) as u32;
+                    - u32::from(received[7] - received[5]);
 
             'outer: for sw2 in fpga_writer.lock().unwrap().subworks() {
                 for i in (offset..16).chain(0..offset) {

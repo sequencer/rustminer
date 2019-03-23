@@ -76,7 +76,7 @@ pub fn version_bits(mut version_mask: u32, mut version_count: u32) -> u32 {
             trailing_zeros
         } else {
             let trailing_ones = (!version_mask).trailing_zeros();
-            let mask = 0xffffffff >> (32 - trailing_ones);
+            let mask = 0xffff_ffff >> (32 - trailing_ones);
             version_bits |= (version_count & mask) << num;
             version_count >>= trailing_ones;
             version_mask >>= trailing_ones;
@@ -166,7 +166,7 @@ impl Reader {
                 uio.write_all(&ENABLE_INTERRUPT).unwrap();
             }
         };
-        thread::spawn(move || reader());
+        thread::spawn(reader);
 
         receiver
     }
