@@ -106,7 +106,8 @@ pub trait BoardConfig: SendCommand {
     fn get_voltage(&mut self, addr: u16) -> Result<f64> {
         let mut vol = [0];
         self.send_command(addr, GET_VOLTAGE, Some(&mut vol), true)?;
-        Ok((1608.420446 - f64::from(vol[0])) / 170.423497)
+        let vol = ((1608.4204 - f64::from(vol[0])) / 17.04235).trunc() / 10.0;
+        Ok(vol)
     }
 
     fn enable_voltage(&mut self, addr: u16) -> Result<()> {

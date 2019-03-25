@@ -79,6 +79,7 @@ fn main_loop() {
 
     let mut i2c = i2c::open("/dev/i2c-0");
     let addr = 0x55;
+    i2c.send_heart_beat(addr).unwrap();
     let send_heart_beat = Interval::new_interval(Duration::from_secs(10))
         .map_err(|_| ())
         .for_each(move |_| i2c.send_heart_beat(addr).map_err(|e| eprintln!("{}", e)));
@@ -96,12 +97,11 @@ fn main_loop() {
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
                     - u32::from(received[7] - received[5]);
 
-            'outer: for sw2 in fpga_writer.lock().unwrap().subworks() {
+            for sw2 in fpga_writer.lock().unwrap().subworks() {
                 for i in (offset..16).chain(0..offset) {
                     let version_bits = fpga::version_bits(sw2.vermask, version_count - i);
                     let target = sw2.target(&nonce, version_bits);
                     if target.starts_with(b"\0\0\0\0") {
-                        println!("target: {}", target.to_hex());
                         offset = i;
                         let pool_diff = pool_diff.clone();
                         let diff = Subwork2::target_diff(&target);
@@ -117,16 +117,14 @@ fn main_loop() {
                             let data = msg.to_string().unwrap();
                             tokio::spawn(pool_sender.send(data).then(|_| Ok(())));
                             println!("submit nonce: 0x{} (difficulty: {})", nonce.to_hex(), diff);
-                        } else {
-                            eprintln!(
-                                "nonce difficulty {} is too low, require {}!",
-                                diff, *pool_diff
-                            );
-                        }
-                        break 'outer;
+                        };
+                        return Ok(());
                     }
                 }
             }
+
+            let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0b00011111;
+            println!("lost nonce: {}, crc check: {}", nonce.to_hex(), crc_check);
             Ok(())
         })
         .map_err(|_| ());
