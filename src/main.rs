@@ -56,26 +56,21 @@ fn main_loop() {
     fpga_writer.set_serial_mode(fpga::SerialMode::Mining);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
-    let send_to_fpga = ws
-        .map(move |w| {
-            Subwork2Maker::new(
-                w,
-                &xnonce.lock().unwrap(),
-                vermask.lock().unwrap().unwrap(),
-                has_new_work.clone(),
-            )
+    let send_to_fpga = ws.for_each(|w| {
+        let fpga_writer = fpga_writer.clone();
+        Subwork2Maker::new(
+            w,
+            &xnonce.lock().unwrap(),
+            vermask.lock().unwrap().unwrap(),
+            has_new_work.clone(),
+        )
+        .for_each(move |sw2| {
+            dbg!(&sw2);
+            fpga_writer.lock().unwrap().writer_subwork2(sw2);
+            Delay::new(Instant::now() + Duration::from_secs(10)).then(move |_| Ok(()))
         })
-        .flatten()
-        .for_each(|sw2| {
-            let fpga_writer = fpga_writer.clone();
-            Delay::new(Instant::now() + Duration::from_secs(5))
-                .map_err(|_| ())
-                .and_then(move |_| {
-                    dbg!(&sw2);
-                    fpga_writer.lock().unwrap().writer_subwork2(sw2);
-                    Ok(())
-                })
-        });
+        .then(|_| Ok(()))
+    });
 
     let mut i2c = i2c::open("/dev/i2c-0");
     let addr = 0x55;
@@ -91,7 +86,7 @@ fn main_loop() {
         .receive_nonce()
         .for_each(|received| {
             let fpga_writer = fpga_writer.clone();
-            println!("received: {}", received.to_hex());
+            print!("received: {}", received.to_hex());
             let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
             let version_count =
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
@@ -105,6 +100,7 @@ fn main_loop() {
                         offset = i;
                         let pool_diff = pool_diff.clone();
                         let diff = Subwork2::target_diff(&target);
+                        println!(", difficulty: {}", diff);
                         let pool_diff = pool_diff.lock().unwrap();
                         let pool_sender = pool_sender.clone();
                         if diff >= *pool_diff {
@@ -122,9 +118,8 @@ fn main_loop() {
                     }
                 }
             }
-
             let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0b00011111;
-            println!("lost nonce: {}, crc check: {}", nonce.to_hex(), crc_check);
+            println!(", lost, crc check: {}", crc_check);
             Ok(())
         })
         .map_err(|_| ());

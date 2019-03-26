@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use bytes::Bytes;
 use futures::stream::Stream;
-use futures::{Future, Poll};
+use futures::{Async::*, Future, Poll};
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
@@ -28,7 +28,19 @@ impl Stream for WorkStream {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.0.poll().map_err(|_| ())
+        let mut item = NotReady;
+        loop {
+            match self.0.poll() {
+                Ok(Ready(w)) => {
+                    if item.is_ready() {
+                        println!("========== drop work! ==========");
+                    };
+                    item = Async::Ready(w);
+                }
+                Ok(NotReady) => return Ok(item),
+                Err(_) => return Err(()),
+            }
+        }
     }
 }
 
@@ -55,7 +67,7 @@ impl Pool {
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
-            work_channel: channel(8),
+            work_channel: channel(4),
             has_new_work: Arc::new(Mutex::new(None)),
             vermask: Arc::new(Mutex::new(None)),
             diff: Arc::new(Mutex::new(1.0)),
@@ -70,10 +82,10 @@ impl Pool {
     }
 
     pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send {
-        let (reader_tx, reader_rx) = channel::<String>(4096);
+        let (reader_tx, reader_rx) = channel::<String>(16);
         self.reader = Some(reader_rx);
 
-        let (writer_tx, writer_rx) = channel::<String>(4096);
+        let (writer_tx, writer_rx) = channel::<String>(16);
         self.writer = Some(writer_tx);
 
         self.tcpstream = Some(std::net::TcpStream::connect(&self.addr).unwrap());

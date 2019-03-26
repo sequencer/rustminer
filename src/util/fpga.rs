@@ -133,7 +133,10 @@ impl Writer {
 
     pub fn set_serial_mode(&mut self, mode: SerialMode) {
         match mode {
-            SerialMode::Direct => self.set_csr(0, false),
+            SerialMode::Direct => {
+                self.set_csr(0, false);
+                self.set_csr(2, false);
+            }
             SerialMode::Mining => {
                 self.set_csr(0, true);
                 self.set_csr(2, true);
