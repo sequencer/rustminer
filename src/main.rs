@@ -1,4 +1,5 @@
 #![feature(const_int_conversion)]
+#![allow(clippy::unreadable_literal)]
 
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
@@ -31,8 +32,8 @@ fn main_loop() {
     let connect_pool = connect_pool.join3(reader, checker);
 
     let exts = vec![
-        "minimum-difficulty".to_string(),
-        "version-rolling".to_string(),
+        String::from("minimum-difficulty"),
+        String::from("version-rolling"),
     ];
     let ext_params = json!({
         "version-rolling.mask": "1fffe000",
@@ -67,7 +68,7 @@ fn main_loop() {
         .for_each(move |sw2| {
             dbg!(&sw2);
             fpga_writer.lock().unwrap().writer_subwork2(sw2);
-            Delay::new(Instant::now() + Duration::from_secs(10)).then(move |_| Ok(()))
+            Delay::new(Instant::now() + Duration::from_secs(10)).then(|_| Ok(()))
         })
         .then(|_| Ok(()))
     });

@@ -4,12 +4,12 @@ use std::time::Instant;
 use bytes::Bytes;
 use futures::stream::Stream;
 use futures::{Async::*, Future, Poll};
+use tokio::codec::{Decoder, LinesCodec};
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio_codec::{Decoder, LinesCodec};
 
 pub mod checker;
 mod message;
@@ -17,8 +17,8 @@ mod reader;
 
 pub use self::message::*;
 pub use self::reader::Reader;
+use super::util::SinkHook;
 use super::work::*;
-use crate::util::SinkHook;
 
 #[derive(Debug)]
 pub struct WorkStream(pub Receiver<Work>);
@@ -28,13 +28,15 @@ impl Stream for WorkStream {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let mut item = NotReady;
+        let mut item: Async<Option<Self::Item>> = NotReady;
         loop {
             match self.0.poll() {
                 Ok(Ready(w)) => {
-                    if item.is_ready() {
-                        println!("========== drop work! ==========");
-                    };
+                    // debug
+                    if let Ready(Some(work)) = item {
+                        println!("=> drop work (id: {})!", work.id);
+                    }
+
                     item = Async::Ready(w);
                 }
                 Ok(NotReady) => return Ok(item),
@@ -46,7 +48,7 @@ impl Stream for WorkStream {
 
 pub struct Pool {
     addr: String,
-    pub counter: Arc<Mutex<u32>>,
+    counter: u32,
     tcpstream: Option<std::net::TcpStream>,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
@@ -62,7 +64,7 @@ impl Pool {
     pub fn new(addr: &str) -> Self {
         Self {
             addr: String::from(addr),
-            counter: Arc::new(Mutex::new(0)),
+            counter: 0,
             tcpstream: None,
             reader: None,
             writer: None,
@@ -76,9 +78,8 @@ impl Pool {
     }
 
     fn counter(&mut self) -> Option<u32> {
-        let mut counter = self.counter.lock().unwrap();
-        *counter += 1;
-        Some(*counter)
+        self.counter += 1;
+        Some(self.counter)
     }
 
     pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send {

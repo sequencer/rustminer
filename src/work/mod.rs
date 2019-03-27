@@ -13,7 +13,7 @@ use super::util::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Work {
-    id: String,
+    pub id: String,
     #[serde(deserialize_with = "hex_to::bytes")]
     prevhash: Bytes,
     #[serde(deserialize_with = "hex_to::bytes")]

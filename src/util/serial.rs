@@ -5,8 +5,8 @@ use std::path::Path;
 use bytes::{BufMut, Bytes, BytesMut};
 use crc_all::CrcAlgo;
 use lazy_static::lazy_static;
+use tokio::codec::{Decoder, Encoder, Framed};
 use tokio::io;
-use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_serial::{Serial, SerialPortSettings};
 
 #[allow(unused_imports)]
@@ -76,7 +76,7 @@ impl Decoder for Codec {
                     if crc5_usb_check(&src[n..n + 7]) {
                         let received = src.split_to(n + 7).split_off(n);
                         let id = received[5];
-                        let nonce = Bytes::from_iter(received[1..5].iter().rev().cloned());
+                        let nonce = Bytes::from_iter(received[1..5].iter().rev());
 
                         // check subwork
                         let mut subwork = None;
