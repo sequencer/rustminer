@@ -1,8 +1,7 @@
 use std::net::Shutdown;
-use std::thread::sleep;
 use std::time::Duration;
 
-use tokio::timer::{Error, Interval};
+use tokio::timer::{Delay, Error, Interval};
 
 use super::*;
 
@@ -18,9 +17,9 @@ pub fn new(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send {
                 eprintln!("pool connect timeout!");
                 let _ = tcpstream.shutdown(Shutdown::Both);
                 *has_new_work.lock().unwrap() = Some(());
-                sleep(Duration::from_secs(20));
                 Err(Error::shutdown())
             }
         })
+        .then(|_| Delay::new(Instant::now() + Duration::from_secs(15)))
         .map_err(|_| ())
 }
