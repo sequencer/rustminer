@@ -1,16 +1,14 @@
 use super::*;
 use crate::util::{hex_to, ToHex};
 
-pub struct Reader;
-
-impl Reader {
-    pub fn create(pool: &mut Pool) -> impl Future<Item = (), Error = ()> + Send {
-        let xnonce = pool.xnonce.clone();
-        let work_sender = pool.work_channel.0.clone();
-        let has_new_work = pool.has_new_work.clone();
-        let vermask = pool.vermask.clone();
-        let diff = pool.diff.clone();
-        pool.receiver()
+impl Pool {
+    pub fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
+        let xnonce = self.xnonce.clone();
+        let work_sender = self.work_channel.0.clone();
+        let has_new_work = self.has_new_work.clone();
+        let vermask = self.vermask.clone();
+        let diff = self.diff.clone();
+        self.receiver()
             .for_each(move |line| {
                 dbg!(&line);
                 let work_sender = work_sender.clone();

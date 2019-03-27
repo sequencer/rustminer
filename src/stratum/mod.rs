@@ -16,7 +16,6 @@ mod message;
 mod reader;
 
 pub use self::message::*;
-pub use self::reader::Reader;
 use super::util::SinkHook;
 use super::work::*;
 
@@ -109,7 +108,7 @@ impl Pool {
 
         let last_active = self.last_active.clone();
         let writer = writer_rx
-            .map_err(|_| std::io::Error::from_raw_os_error(-1))
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
             .inspect(move |s| {
                 dbg!(s);
             })
