@@ -105,6 +105,7 @@ impl Pool {
                 Ok(())
             })
             .map_err(|_| ());
+        let reader = reader.join(self.reader());
 
         let last_active = self.last_active.clone();
         let writer = writer_rx
@@ -117,7 +118,9 @@ impl Pool {
             }))
             .map_err(|_| ());
 
-        reader.join(writer).then(|_| Ok(()))
+        let checker = self.checker();
+
+        checker.join3(reader, writer).then(|_| Ok(()))
     }
 
     pub fn sender(&mut self) -> Sender<String> {

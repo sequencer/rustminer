@@ -6,7 +6,7 @@ use tokio::timer::{Delay, Error, Interval};
 use super::*;
 
 impl Pool {
-    pub fn checker(&mut self) -> impl Future<Item = (), Error = ()> + Send {
+    pub(super) fn checker(&mut self) -> impl Future<Item = (), Error = ()> + Send {
         let last_active = self.last_active.clone();
         let tcpstream = self.tcpstream.as_ref().unwrap().try_clone().unwrap();
         let has_new_work = self.has_new_work.clone();

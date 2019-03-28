@@ -2,7 +2,7 @@ use super::*;
 use crate::util::{hex_to, ToHex};
 
 impl Pool {
-    pub fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
+    pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
         let xnonce = self.xnonce.clone();
         let work_sender = self.work_channel.0.clone();
         let has_new_work = self.has_new_work.clone();

@@ -25,11 +25,7 @@ use self::work::*;
 
 fn main_loop() {
     let mut pool = Pool::new("121.29.19.24:443");
-
     let connect_pool = pool.connect();
-    let reader = pool.reader();
-    let checker = pool.checker();
-    let connect_pool = connect_pool.join3(reader, checker);
 
     let exts = vec![
         String::from("minimum-difficulty"),
