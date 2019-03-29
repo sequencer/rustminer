@@ -3,13 +3,13 @@ use std::time::Instant;
 
 use bytes::Bytes;
 use futures::stream::Stream;
+use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async::*, Future, Poll};
 use tokio::codec::{Decoder, LinesCodec};
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub mod checker;
 mod message;
@@ -109,7 +109,7 @@ impl Pool {
 
         let last_active = self.last_active.clone();
         let writer = writer_rx
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))
             .inspect(move |s| {
                 dbg!(s);
             })

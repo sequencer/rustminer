@@ -79,9 +79,14 @@ fn main_loop() {
     let send_to_board = send_heart_beat.join(send_to_fpga);
 
     let mut offset = 0;
-    let print_nonce = fpga_reader
+    let receive_nonce = fpga_reader
         .receive_nonce()
+        .map_err(|_| ())
         .for_each(|received| {
+            if pool_sender.is_closed() {
+                return Err(());
+            };
+
             let fpga_writer = fpga_writer.clone();
             print!("received: {}", received.to_hex());
             let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
@@ -118,13 +123,10 @@ fn main_loop() {
             let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0b00011111;
             println!(", lost, crc check: {}", crc_check);
             Ok(())
-        })
-        .map_err(|_| ());
+        });
 
     let mut runtime = current_thread::Runtime::new().unwrap();
-    runtime
-        .block_on(connect_pool.join(send_to_board).join(print_nonce))
-        .unwrap();
+    let _ = runtime.block_on(connect_pool.join(send_to_board).join(receive_nonce));
 }
 
 fn main() {
