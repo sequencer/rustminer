@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
-use std::sync::{Arc, Mutex, Once};
+use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 
@@ -43,7 +43,8 @@ pub struct Writer {
 }
 
 pub struct Reader {
-    mmap: Arc<Mutex<Mmap>>,
+    data: Option<Mmap>,
+    csr_in: Option<Csr>,
 }
 
 pub struct SerialSender {
@@ -70,7 +71,8 @@ pub fn writer() -> Writer {
 
 pub fn reader() -> Reader {
     Reader {
-        mmap: Arc::new(Mutex::new(mmap(148, 13))),
+        data: Some(mmap(148, 13)),
+        csr_in: Some(Csr::new(mmap(80, 1))),
     }
 }
 
@@ -216,7 +218,8 @@ impl Writer {
 impl Reader {
     pub fn receive_nonce(&mut self) -> Receiver<Bytes> {
         let (sender, receiver) = channel(32);
-        let mmap = self.mmap.clone();
+        let mut mmap = self.data.take().unwrap();
+        let mut csr_in = self.csr_in.take().unwrap();
 
         const ENABLE_INTERRUPT: [u8; 4] = 1u32.to_ne_bytes();
 
@@ -231,9 +234,10 @@ impl Reader {
 
             while uio.read(&mut buf).unwrap() == 4 {
                 let mut nonce = Bytes::with_capacity(12);
-                nonce.extend(mmap.lock().unwrap().read(0, 12));
+                nonce.extend(mmap.read(0, 12));
 
                 sender.clone().send(nonce).wait().unwrap();
+                csr_in.notify(3);
                 uio.write_all(&ENABLE_INTERRUPT).unwrap();
             }
         };
