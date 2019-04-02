@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
 use std::thread;
 
 use bytes::Bytes;
@@ -13,6 +13,21 @@ use tokio::sync::mpsc::{channel, Receiver};
 
 use super::Mmap;
 use crate::work::Subwork2;
+
+static mut UIO_MMAP: Mmap = unsafe { Mmap::uninitialized() };
+static INIT_MMAP: Once = Once::new();
+
+pub fn mmap(offset: usize, size: usize) -> Mmap {
+    let uio_mmap = unsafe {
+        INIT_MMAP.call_once(|| {
+            UIO_MMAP = Mmap::new("/dev/uio0", 0, 100);
+        });
+        &UIO_MMAP
+    };
+    assert!(offset + size <= uio_mmap.size());
+
+    unsafe { Mmap::from_raw(uio_mmap.ptr().add(offset), size) }
+}
 
 pub struct Writer {
     mmap: Mmap,
@@ -29,13 +44,12 @@ pub enum SerialMode {
 }
 
 pub fn new() -> (Writer, Reader) {
-    let mmap = Mmap::new("/dev/uio0", 100, 0);
     let writer = Writer {
-        mmap: mmap.reduce(82),
+        mmap: mmap(0, 82),
         subworks: VecDeque::with_capacity(2),
     };
     let reader = Reader {
-        mmap: Arc::new(Mutex::new(mmap.offset(84))),
+        mmap: Arc::new(Mutex::new(mmap(84, 12))),
     };
     (writer, reader)
 }

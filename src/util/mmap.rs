@@ -11,6 +11,15 @@ pub struct Mmap {
     size: size_t,
 }
 
+impl Mmap {
+    pub const unsafe fn uninitialized() -> Self {
+        Self {
+            ptr: 0 as *mut u8,
+            size: 0,
+        }
+    }
+}
+
 pub struct ReadMmap<'a> {
     mmap: &'a mut Mmap,
     offset: usize,
@@ -19,7 +28,7 @@ pub struct ReadMmap<'a> {
 }
 
 impl Mmap {
-    pub fn new<T: AsRef<Path>>(path: T, size: size_t, offset: off_t) -> Self {
+    pub fn new<T: AsRef<Path>>(path: T, offset: off_t, size: size_t) -> Self {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -51,20 +60,8 @@ impl Mmap {
         ReadMmap::new(self, offset, size)
     }
 
-    pub fn offset(&self, offset: usize) -> Self {
-        assert!(offset < self.size);
-        Self {
-            ptr: unsafe { self.ptr.add(offset) },
-            size: self.size - offset,
-        }
-    }
-
-    pub fn reduce(&self, size: usize) -> Self {
-        assert!(size < self.size);
-        Self {
-            ptr: self.ptr,
-            size,
-        }
+    pub unsafe fn from_raw(ptr: *mut u8, size: usize) -> Self {
+        Self { ptr, size }
     }
 
     pub fn ptr(&self) -> *mut u8 {
@@ -145,3 +142,5 @@ impl IndexMut<Range<usize>> for Mmap {
 }
 
 unsafe impl Send for Mmap {}
+
+unsafe impl Sync for Mmap {}
