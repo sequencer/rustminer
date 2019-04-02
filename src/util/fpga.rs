@@ -55,11 +55,6 @@ pub struct SerialSender {
     io_enable: Csr,
 }
 
-pub enum SerialMode {
-    Direct,
-    Mining,
-}
-
 pub fn writer() -> Writer {
     Writer {
         data: mmap(0, 80),
@@ -138,7 +133,7 @@ impl Csr {
     }
 
     pub fn set_csr(&mut self, csr: usize, value: bool) {
-        assert!(csr < self.mmap.size());
+        assert!(csr < 8);
         let ptr = self.mmap.ptr();
         let data = unsafe { ptr.read_volatile() };
         let value = if value {
@@ -155,7 +150,7 @@ impl Csr {
     }
 
     pub fn get_csr(&mut self, csr: usize) -> bool {
-        assert!(csr < self.mmap.size());
+        assert!(csr < 8);
 
         let data = unsafe { self.mmap.ptr().read_volatile() };
         let value = 1 << csr;
@@ -173,7 +168,7 @@ impl Csr {
     }
 
     pub fn notify(&mut self, csr: usize) {
-        assert!(csr < 16);
+        assert!(csr < 8);
         self.set_csr(csr, true);
         thread::sleep(Duration::from_nanos(100));
         self.set_csr(csr, false);
@@ -268,11 +263,12 @@ impl SerialSender {
 
     pub fn writer_work(&mut self, work: &[u8]) {
         assert!(work.len() <= 56);
+        self.set_send_work();
 
         loop {
             if self.csr_out.get_csr(0) {
                 // set interval
-                self.data.write(0, 1000u16.to_be_bytes());
+                self.data.write(0, 1000u16.to_le_bytes());
                 self.data.write(2, work);
                 self.csr_in.notify(1);
                 break;
