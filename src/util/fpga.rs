@@ -3,6 +3,7 @@ use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex, Once};
 use std::thread;
+use std::time::Duration;
 
 use bytes::Bytes;
 use crc_all::CrcAlgo;
@@ -15,12 +16,13 @@ use super::Mmap;
 use crate::work::Subwork2;
 
 static mut UIO_MMAP: Mmap = unsafe { Mmap::uninitialized() };
-static INIT_MMAP: Once = Once::new();
 
 pub fn mmap(offset: usize, size: usize) -> Mmap {
+    static INIT: Once = Once::new();
+
     let uio_mmap = unsafe {
-        INIT_MMAP.call_once(|| {
-            UIO_MMAP = Mmap::new("/dev/uio0", 0, 100);
+        INIT.call_once(|| {
+            UIO_MMAP = Mmap::new("/dev/uio0", 0, 161);
         });
         &UIO_MMAP
     };
@@ -29,8 +31,14 @@ pub fn mmap(offset: usize, size: usize) -> Mmap {
     unsafe { Mmap::from_raw(uio_mmap.ptr().add(offset), size) }
 }
 
-pub struct Writer {
+pub struct Csr {
     mmap: Mmap,
+}
+
+pub struct Writer {
+    data: Mmap,
+    io_select: Csr,
+    io_enable: Csr,
     subworks: VecDeque<Subwork2>,
 }
 
@@ -38,20 +46,42 @@ pub struct Reader {
     mmap: Arc<Mutex<Mmap>>,
 }
 
+pub struct SerialSender {
+    data: Mmap,
+    csr_in: Csr,
+    csr_out: Csr,
+    io_select: Csr,
+    io_enable: Csr,
+}
+
 pub enum SerialMode {
     Direct,
     Mining,
 }
 
-pub fn new() -> (Writer, Reader) {
-    let writer = Writer {
-        mmap: mmap(0, 82),
+pub fn writer() -> Writer {
+    Writer {
+        data: mmap(0, 80),
+        io_select: Csr::new(mmap(84, 1)),
+        io_enable: Csr::new(mmap(85, 1)),
         subworks: VecDeque::with_capacity(2),
-    };
-    let reader = Reader {
-        mmap: Arc::new(Mutex::new(mmap(84, 12))),
-    };
-    (writer, reader)
+    }
+}
+
+pub fn reader() -> Reader {
+    Reader {
+        mmap: Arc::new(Mutex::new(mmap(148, 13))),
+    }
+}
+
+pub fn serial_sender() -> SerialSender {
+    SerialSender {
+        data: mmap(86, 62),
+        csr_in: Csr::new(mmap(80, 1)),
+        csr_out: Csr::new(mmap(82, 1)),
+        io_select: Csr::new(mmap(84, 1)),
+        io_enable: Csr::new(mmap(85, 1)),
+    }
 }
 
 pub fn crc5_false(data: &[u8], offset: usize) -> u8 {
@@ -100,37 +130,14 @@ pub fn version_bits(mut version_mask: u32, mut version_count: u32) -> u32 {
     version_bits.swap_bytes()
 }
 
-impl Writer {
-    pub fn writer_subwork2(&mut self, sw2: Subwork2) {
-        self.mmap.write(0, sw2.version.to_be_bytes());
-        self.mmap.write(4, sw2.vermask.to_be_bytes());
-        debug_assert_eq!(sw2.prevhash.len(), 32);
-        self.mmap.write(8, &sw2.prevhash);
-        debug_assert_eq!(sw2.merkle_root.len(), 32);
-        self.mmap.write(40, &sw2.merkle_root);
-        debug_assert_eq!(sw2.ntime.len(), 4);
-        self.mmap.write(72, &sw2.ntime);
-        debug_assert_eq!(sw2.nbits.len(), 4);
-        self.mmap.write(76, &sw2.nbits);
-
-        self.subworks.push_front(sw2);
-        self.subworks.truncate(2);
-
-        // debug
-        print!("write work: ");
-        for b in self.mmap.read(0, 80) {
-            print!("{:02x}", b);
-        }
-        println!();
+impl Csr {
+    fn new(mmap: Mmap) -> Self {
+        Self { mmap }
     }
 
-    pub fn subworks(&self) -> Vec<Subwork2> {
-        self.subworks.iter().cloned().collect()
-    }
-
-    fn set_csr(&mut self, csr: usize, value: bool) {
-        assert!(csr < 16);
-        let ptr = unsafe { self.mmap.ptr().add(80) };
+    pub fn set_csr(&mut self, csr: usize, value: bool) {
+        assert!(csr < self.mmap.size());
+        let ptr = self.mmap.ptr();
         let data = unsafe { ptr.read_volatile() };
         let value = if value {
             data | 1 << csr
@@ -145,17 +152,64 @@ impl Writer {
         }
     }
 
-    pub fn set_serial_mode(&mut self, mode: SerialMode) {
-        match mode {
-            SerialMode::Direct => {
-                self.set_csr(0, false);
-                self.set_csr(2, false);
-            }
-            SerialMode::Mining => {
-                self.set_csr(0, true);
-                self.set_csr(2, true);
+    pub fn get_csr(&mut self, csr: usize) -> bool {
+        assert!(csr < self.mmap.size());
+
+        let data = unsafe { self.mmap.ptr().read_volatile() };
+        let value = 1 << csr;
+        data & value == value
+    }
+
+    pub fn set_all(&mut self, value: bool) {
+        unsafe {
+            if value {
+                self.mmap.ptr().write_volatile(0xff);
+            } else {
+                self.mmap.ptr().write_volatile(0);
             }
         }
+    }
+
+    pub fn notify(&mut self, csr: usize) {
+        assert!(csr < 16);
+        self.set_csr(csr, true);
+        thread::sleep(Duration::from_nanos(100));
+        self.set_csr(csr, false);
+    }
+}
+
+impl Writer {
+    pub fn writer_subwork2(&mut self, sw2: Subwork2) {
+        self.data.write(0, sw2.version.to_be_bytes());
+        self.data.write(4, sw2.vermask.to_be_bytes());
+        debug_assert_eq!(sw2.prevhash.len(), 32);
+        self.data.write(8, &sw2.prevhash);
+        debug_assert_eq!(sw2.merkle_root.len(), 32);
+        self.data.write(40, &sw2.merkle_root);
+        debug_assert_eq!(sw2.ntime.len(), 4);
+        self.data.write(72, &sw2.ntime);
+        debug_assert_eq!(sw2.nbits.len(), 4);
+        self.data.write(76, &sw2.nbits);
+
+        self.subworks.push_front(sw2);
+        self.subworks.truncate(2);
+
+        // debug
+        print!("write work: ");
+        for b in self.data.read(0, 80) {
+            print!("{:02x}", b);
+        }
+        println!();
+    }
+
+    pub fn enable_sender(&mut self, board: usize) {
+        self.io_select.set_all(false);
+        self.io_select.set_csr(board, false);
+        self.io_enable.set_csr(board, true);
+    }
+
+    pub fn subworks(&self) -> Vec<Subwork2> {
+        self.subworks.iter().cloned().collect()
     }
 }
 
@@ -186,5 +240,41 @@ impl Reader {
         thread::spawn(reader);
 
         receiver
+    }
+}
+
+impl SerialSender {
+    pub fn select_board(&mut self, board: usize) {
+        self.io_select.set_all(false);
+        self.io_select.set_csr(board, true);
+        self.io_enable.set_csr(board, false);
+    }
+
+    pub fn set_direct(&mut self) {
+        self.csr_in.set_csr(0, false);
+    }
+
+    pub fn set_send_work(&mut self) {
+        self.csr_in.set_csr(0, true);
+    }
+
+    pub fn unselect_all(&mut self) {
+        self.io_select.set_all(false);
+    }
+
+    pub fn writer_work(&mut self, work: &[u8]) {
+        assert!(work.len() <= 56);
+
+        loop {
+            if self.csr_out.get_csr(0) {
+                // set interval
+                self.data.write(0, 1000u16.to_be_bytes());
+                self.data.write(2, work);
+                self.csr_in.notify(1);
+                break;
+            } else {
+                thread::sleep(Duration::from_micros(10))
+            }
+        }
     }
 }

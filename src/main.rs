@@ -49,8 +49,9 @@ fn main_loop() {
     let xnonce = pool.xnonce.clone();
     let vermask = pool.vermask.clone();
     let has_new_work = pool.has_new_work.clone();
-    let (mut fpga_writer, mut fpga_reader) = fpga::new();
-    fpga_writer.set_serial_mode(fpga::SerialMode::Mining);
+
+    let mut fpga_writer = fpga::writer();
+    fpga_writer.enable_sender(0);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
     let send_to_fpga = ws.for_each(|w| {
@@ -79,7 +80,7 @@ fn main_loop() {
     let send_to_board = send_heart_beat.join(send_to_fpga);
 
     let mut offset = 0;
-    let receive_nonce = fpga_reader
+    let receive_nonce = fpga::reader()
         .receive_nonce()
         .map_err(|_| ())
         .for_each(|received| {
