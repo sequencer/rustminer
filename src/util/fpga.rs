@@ -277,4 +277,10 @@ impl SerialSender {
             }
         }
     }
+
+    pub fn get_count(&mut self) -> u32 {
+        let mut count = Vec::with_capacity(4);
+        count.extend(self.data.read(58, 4));
+        u32::from_le_bytes(unsafe { *(count.as_ptr() as *const [u8; 4]) })
+    }
 }
