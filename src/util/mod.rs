@@ -24,9 +24,11 @@ where
     T: AsRef<[u8]> + AsMut<[u8]> + Extend<u8>,
 {
     fn __flip32(&mut self) {
-        let len = self.as_ref().len();
-        if len % 4 > 0 {
-            self.extend(repeat(b'\0').take(4 - len % 4))
+        let mut len = self.as_ref().len();
+        let residue = len % 4;
+        if residue > 0 {
+            self.extend(repeat(b'\0').take(4 - residue));
+            len += 4 - residue;
         }
         for i in 0..(len / 4) {
             self.as_mut()[i * 4..(i * 4 + 4)].reverse();
