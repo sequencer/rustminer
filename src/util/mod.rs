@@ -1,3 +1,4 @@
+use std::iter::repeat;
 use std::iter::FromIterator;
 
 use bytes::{Bytes, BytesMut};
@@ -14,24 +15,45 @@ pub use self::hex::{FromHex, ToHex};
 pub use self::mmap::Mmap;
 pub use sinkhook::SinkHook;
 
+trait __Flip32: Sized {
+    fn __flip32(&mut self);
+}
+
+impl<T> __Flip32 for T
+where
+    T: AsRef<[u8]> + AsMut<[u8]> + Extend<u8>,
+{
+    fn __flip32(&mut self) {
+        let len = self.as_ref().len();
+        if len % 4 > 0 {
+            self.extend(repeat(b'\0').take(4 - len % 4))
+        }
+        for i in 0..(len / 4) {
+            self.as_mut()[i * 4..(i * 4 + 4)].reverse();
+        }
+    }
+}
+
 pub trait Flip32: Sized {
     fn flip32(self) -> Self;
 }
 
 impl Flip32 for Bytes {
     fn flip32(self) -> Self {
-        let data = self.try_mut().unwrap();
-        data.flip32().freeze()
+        self.try_mut().unwrap().flip32().freeze()
     }
 }
 
 impl Flip32 for BytesMut {
     fn flip32(mut self) -> Self {
-        let len = self.len();
-        assert_eq!(len % 4, 0);
-        for i in 0..(len / 4) {
-            self[i * 4..(i * 4 + 4)].reverse();
-        }
+        self.__flip32();
+        self
+    }
+}
+
+impl Flip32 for Vec<u8> {
+    fn flip32(mut self) -> Self {
+        self.__flip32();
         self
     }
 }
