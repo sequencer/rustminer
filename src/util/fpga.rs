@@ -170,7 +170,6 @@ impl Csr {
     pub fn notify(&mut self, csr: usize) {
         assert!(csr < 8);
         self.set_csr(csr, true);
-        thread::sleep(Duration::from_nanos(100));
         self.set_csr(csr, false);
     }
 }
@@ -261,14 +260,14 @@ impl SerialSender {
         self.io_select.set_all(false);
     }
 
-    pub fn writer_work(&mut self, work: &[u8]) {
+    pub fn writer_work(&mut self, work: &[u8], interval: u16) {
         assert!(work.len() <= 56);
         self.set_send_work();
 
         loop {
             if self.csr_out.get_csr(0) {
                 // set interval
-                self.data.write(0, 1000u16.to_le_bytes());
+                self.data.write(0, interval.to_le_bytes());
                 self.data.write(2, work);
                 self.csr_in.notify(1);
                 break;

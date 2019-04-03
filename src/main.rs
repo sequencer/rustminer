@@ -51,7 +51,7 @@ fn main_loop() {
     let has_new_work = pool.has_new_work.clone();
 
     let mut fpga_writer = fpga::writer();
-    fpga_writer.enable_sender(0);
+    fpga_writer.enable_sender(5);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
     let send_to_fpga = ws.for_each(|w| {
@@ -93,7 +93,7 @@ fn main_loop() {
             let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
             let version_count =
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
-                    - u32::from(received[7] - received[5]);
+                    - u32::from((received[7] - received[5]) & 0x7f);
 
             for sw2 in fpga_writer.lock().unwrap().subworks() {
                 for i in (offset..16).chain(0..offset) {
