@@ -10,7 +10,6 @@ impl Pool {
         let diff = self.diff.clone();
         self.receiver()
             .for_each(move |line| {
-                dbg!(&line);
                 let work_sender = work_sender.clone();
                 if let Ok(s) = serde_json::from_str::<Action>(&line) {
                     match s.params {

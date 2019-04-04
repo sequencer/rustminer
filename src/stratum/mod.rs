@@ -100,6 +100,7 @@ impl Pool {
         let reader = stream
             .inspect(move |_| *last_active.lock().unwrap() = Ok(Instant::now()))
             .for_each(move |line| {
+                dbg!(&line);
                 let send = reader_tx.clone().send(line).then(|_| Ok(()));
                 tokio::spawn(send);
                 Ok(())

@@ -17,11 +17,15 @@ impl Pool {
                 _ => {
                     eprintln!("pool connect timeout!");
                     let _ = tcpstream.shutdown(Shutdown::Both);
-                    *has_new_work.lock().unwrap() = Some(());
                     Err(Error::shutdown())
                 }
             })
-            .then(|_| Delay::new(Instant::now() + Duration::from_secs(15)))
+            .then(|_| {
+                Delay::new(Instant::now() + Duration::from_secs(15)).and_then(move |_| {
+                    *has_new_work.lock().unwrap() = Some(());
+                    Ok(())
+                })
+            })
             .map_err(|_| ())
     }
 }
