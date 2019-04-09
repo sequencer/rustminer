@@ -67,7 +67,7 @@ fn main_loop() {
             has_new_work.clone(),
         )
         .for_each(move |sw2| {
-            dbg!(&sw2);
+            // dbg!(&sw2);
             fpga_writer.lock().unwrap().writer_subwork2(sw2);
 
             loop_fn(clean_works.clone(), |clean_works| {
@@ -104,7 +104,7 @@ fn main_loop() {
             };
 
             let fpga_writer = fpga_writer.clone();
-            print!("received: {}", received.to_hex());
+            eprint!("received: {}", received.to_hex());
             let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
             let version_count =
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
@@ -118,7 +118,7 @@ fn main_loop() {
                         offset = i;
                         let pool_diff = pool_diff.clone();
                         let diff = Subwork2::target_diff(&target);
-                        println!(", difficulty: {}", diff);
+                        eprintln!(", difficulty: {}", diff);
                         let pool_diff = pool_diff.lock().unwrap();
                         let pool_sender = pool_sender.clone();
                         if diff >= *pool_diff {
@@ -137,7 +137,7 @@ fn main_loop() {
                 }
             }
             let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0b00011111;
-            println!(", lost, crc check: {}", crc_check);
+            eprintln!(", lost, crc check: {}", crc_check);
             Ok(())
         });
 
