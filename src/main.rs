@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
+use futures::future::{loop_fn, Loop};
 use serde_json::json;
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
@@ -53,9 +54,12 @@ fn main_loop() {
     let mut fpga_writer = fpga::writer();
     fpga_writer.enable_sender(5);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
+    let clean_works = pool.clean_works.clone();
 
     let send_to_fpga = ws.for_each(|w| {
         let fpga_writer = fpga_writer.clone();
+        let clean_works = clean_works.clone();
+
         Subwork2Maker::new(
             w,
             &xnonce.lock().unwrap(),
@@ -65,7 +69,18 @@ fn main_loop() {
         .for_each(move |sw2| {
             dbg!(&sw2);
             fpga_writer.lock().unwrap().writer_subwork2(sw2);
-            Delay::new(Instant::now() + Duration::from_secs(10)).then(|_| Ok(()))
+
+            loop_fn(clean_works.clone(), |clean_works| {
+                Delay::new(Instant::now() + Duration::from_millis(100)).then(|_| {
+                    if clean_works.lock().unwrap().take().is_some() {
+                        Result::<_, ()>::Ok(Loop::Break(clean_works))
+                    } else {
+                        Ok(Loop::Continue(clean_works))
+                    }
+                })
+            })
+            .timeout(Duration::from_secs(10))
+            .then(|_| Ok(()))
         })
         .then(|_| Ok(()))
     });
