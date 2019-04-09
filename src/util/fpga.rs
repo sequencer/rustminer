@@ -248,6 +248,12 @@ impl SerialSender {
         self.io_enable.set_csr(board, false);
     }
 
+    pub fn enable_sender(&mut self, board: usize) {
+        self.io_select.set_all(false);
+        self.io_select.set_csr(board, false);
+        self.io_enable.set_csr(board, true);
+    }
+
     pub fn set_direct(&mut self) {
         self.csr_in.set_csr(0, false);
     }
