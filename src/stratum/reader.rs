@@ -5,7 +5,6 @@ impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
         let xnonce = self.xnonce.clone();
         let work_sender = self.work_channel.0.clone();
-        let clean_works = self.clean_works.clone();
         let has_new_work = self.has_new_work.clone();
         let vermask = self.vermask.clone();
         let diff = self.diff.clone();
@@ -14,20 +13,12 @@ impl Pool {
                 if let Ok(s) = serde_json::from_str::<Action>(&line) {
                     match s.params {
                         Params::Work(w) => {
-                            let clean = w.clean;
-                            let work_sender = work_sender.clone();
-                            let clean_works = clean_works.clone();
-
-                            tokio::spawn(work_sender.send(w).then(move |_| {
-                                if clean {
-                                    *clean_works.lock().unwrap() = Some(());
-                                    println!("=> clean works!");
-                                };
+                            let has_new_work = has_new_work.clone();
+                            tokio::spawn(work_sender.clone().send(w).then(move |_| {
+                                *has_new_work.lock().unwrap() = Some(());
+                                println!("=> received new work!");
                                 Ok(())
                             }));
-
-                            *has_new_work.lock().unwrap() = Some(());
-                            println!("=> received new work!");
                         }
                         Params::Num([n]) => {
                             if s.method.as_str() == "mining.set_difficulty" {

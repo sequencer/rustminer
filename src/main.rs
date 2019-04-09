@@ -54,11 +54,10 @@ fn main_loop() {
     let mut fpga_writer = fpga::writer();
     fpga_writer.enable_sender(5);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
-    let clean_works = pool.clean_works.clone();
 
     let send_to_fpga = ws.for_each(|w| {
         let fpga_writer = fpga_writer.clone();
-        let clean_works = clean_works.clone();
+        let has_new_work = has_new_work.clone();
 
         Subwork2Maker::new(
             w,
@@ -70,12 +69,12 @@ fn main_loop() {
             // dbg!(&sw2);
             fpga_writer.lock().unwrap().writer_subwork2(sw2);
 
-            loop_fn(clean_works.clone(), |clean_works| {
+            loop_fn(has_new_work.clone(), |has_new_work| {
                 Delay::new(Instant::now() + Duration::from_millis(100)).then(|_| {
-                    if clean_works.lock().unwrap().take().is_some() {
-                        Result::<_, ()>::Ok(Loop::Break(clean_works))
+                    if has_new_work.lock().unwrap().is_some() {
+                        Result::<_, ()>::Ok(Loop::Break(has_new_work))
                     } else {
-                        Ok(Loop::Continue(clean_works))
+                        Ok(Loop::Continue(has_new_work))
                     }
                 })
             })
