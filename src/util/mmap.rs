@@ -2,6 +2,7 @@ use std::fs::OpenOptions;
 use std::ops::{Index, IndexMut, Range};
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
+use std::ptr::null_mut;
 
 use libc::{off_t, size_t};
 
@@ -14,7 +15,7 @@ pub struct Mmap {
 impl Mmap {
     pub const unsafe fn uninitialized() -> Self {
         Self {
-            ptr: 0 as *mut u8,
+            ptr: null_mut(),
             size: 0,
         }
     }
@@ -33,7 +34,7 @@ impl Mmap {
             .read(true)
             .write(true)
             .open(&path)
-            .unwrap_or_else(|_| panic!("can't open {} !", path.as_ref().display()));
+            .unwrap_or_else(|_| panic!("can't open {}!", path.as_ref().display()));
 
         let ptr = unsafe {
             libc::mmap(
@@ -50,7 +51,7 @@ impl Mmap {
 
     pub fn write<T: AsRef<[u8]>>(&mut self, offset: usize, data: T) {
         let data = data.as_ref();
-        assert!(offset + data.len() <= self.size());
+        assert!(offset + data.len() <= self.size);
         for (i, v) in data.iter().enumerate() {
             unsafe { self.ptr.add(offset + i).write_volatile(*v) }
         }

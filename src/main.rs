@@ -27,9 +27,7 @@ fn main_loop() {
     let mut pool = Pool::new("121.29.19.24:443");
     let connect_pool = pool.connect();
 
-    let exts = vec![
-        String::from("version-rolling"),
-    ];
+    let exts = vec![String::from("version-rolling")];
     let ext_params = json!({
         "version-rolling.mask": "1fffe000",
         "version-rolling.min-bit-count": 2
@@ -72,7 +70,6 @@ fn main_loop() {
                 .timeout(Duration::from_secs(10))
                 .then(|_| Ok(()))
         })
-        .then(|_| Ok(()))
     });
 
     let mut i2c = i2c::open("/dev/i2c-0");
