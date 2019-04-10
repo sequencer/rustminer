@@ -107,12 +107,9 @@ fn main_loop() {
                     let target = sw2.target(&nonce, version_bits);
                     if target.starts_with(b"\0\0\0\0") {
                         offset = i;
-                        let pool_diff = pool_diff.clone();
                         let diff = Subwork2::target_diff(&target);
                         eprintln!(", difficulty: {}", diff);
-                        let pool_diff = pool_diff.lock().unwrap();
-                        let pool_sender = pool_sender.clone();
-                        if diff >= *pool_diff {
+                        if diff >= *pool_diff.lock().unwrap() {
                             let params = sw2.into_params("h723n8m.001", &nonce, version_bits);
                             let msg = Action {
                                 id: Some(4),
@@ -120,7 +117,7 @@ fn main_loop() {
                                 params,
                             };
                             let data = msg.to_string().unwrap();
-                            tokio::spawn(pool_sender.send(data).then(|_| Ok(())));
+                            tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
                             println!("submit nonce: 0x{} (difficulty: {})", nonce.to_hex(), diff);
                         };
                         return Ok(());
