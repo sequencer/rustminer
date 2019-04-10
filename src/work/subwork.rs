@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use bytes::BytesMut;
 use futures::stream::Stream;
 use futures::{Async, Poll};
@@ -55,29 +53,29 @@ pub struct SubworkMaker {
     xnonce2_size: usize,
     counter: BigUint,
     serial_cloned: Box<SerialPort>,
-    has_new_work: Arc<Mutex<Option<()>>>,
+    work_notify: Notify,
 }
 
 impl SubworkMaker {
     pub fn new(
         work: Work,
         xnonce: &(Bytes, usize),
-        has_new_work: Arc<Mutex<Option<()>>>,
+        work_notify: Notify,
         serial_cloned: Box<SerialPort>,
     ) -> Self {
-        has_new_work.lock().unwrap().take();
+        work_notify.notified();
         Self {
             work,
             xnonce1: Bytes::from(xnonce.0.as_ref()),
             xnonce2_size: xnonce.1,
             counter: BigUint::from(0u32),
             serial_cloned,
-            has_new_work,
+            work_notify,
         }
     }
 
     fn next(&mut self) -> Option<Subwork> {
-        if self.has_new_work.lock().unwrap().take().is_some() {
+        if self.work_notify.notified() {
             if self.serial_cloned.clear(ClearBuffer::Output).is_ok() {
                 println!("serial buffer cleared!");
             };

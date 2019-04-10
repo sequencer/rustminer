@@ -16,6 +16,7 @@ mod message;
 mod reader;
 
 pub use self::message::*;
+use super::util::Notify;
 use super::util::SinkHook;
 use super::work::*;
 
@@ -53,7 +54,7 @@ pub struct Pool {
     writer: Option<Sender<String>>,
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub work_channel: (Sender<Work>, Receiver<Work>),
-    pub has_new_work: Arc<Mutex<Option<()>>>,
+    pub work_notify: Notify,
     pub vermask: Arc<Mutex<Option<u32>>>,
     pub diff: Arc<Mutex<f64>>,
     pub last_active: Arc<Mutex<Result<Instant, io::Error>>>,
@@ -69,7 +70,7 @@ impl Pool {
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             work_channel: channel(4),
-            has_new_work: Arc::new(Mutex::new(None)),
+            work_notify: Notify::default(),
             vermask: Arc::new(Mutex::new(None)),
             diff: Arc::new(Mutex::new(1.0)),
             last_active: Arc::new(Mutex::new(Ok(Instant::now()))),

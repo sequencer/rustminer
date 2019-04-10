@@ -5,7 +5,7 @@ impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
         let xnonce = self.xnonce.clone();
         let work_sender = self.work_channel.0.clone();
-        let has_new_work = self.has_new_work.clone();
+        let work_notify = self.work_notify.clone();
         let vermask = self.vermask.clone();
         let diff = self.diff.clone();
         self.receiver()
@@ -13,9 +13,9 @@ impl Pool {
                 if let Ok(s) = serde_json::from_str::<Action>(&line) {
                     match s.params {
                         Params::Work(w) => {
-                            let has_new_work = has_new_work.clone();
+                            let work_notify = work_notify.clone();
                             tokio::spawn(work_sender.clone().send(w).then(move |_| {
-                                *has_new_work.lock().unwrap() = Some(());
+                                work_notify.notify();
                                 println!("=> received new work!");
                                 Ok(())
                             }));

@@ -8,12 +8,16 @@ pub mod fpga;
 pub mod hex;
 pub mod i2c;
 mod mmap;
+mod notify;
 pub mod serial;
 mod sinkhook;
 
-pub use self::hex::{FromHex, ToHex};
-pub use self::mmap::Mmap;
-pub use sinkhook::SinkHook;
+pub use self::{
+    hex::{FromHex, ToHex},
+    mmap::Mmap,
+    notify::Notify,
+    sinkhook::SinkHook,
+};
 
 trait __Flip32: Sized {
     fn __flip32(&mut self);

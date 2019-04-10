@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use futures::stream::Stream;
 use futures::{Async, Poll};
 use num_traits::cast::ToPrimitive;
@@ -65,29 +63,24 @@ pub struct Subwork2Maker {
     xnonce2_size: usize,
     vermask: u32,
     counter: BigUint,
-    has_new_work: Arc<Mutex<Option<()>>>,
+    work_notify: Notify,
 }
 
 impl Subwork2Maker {
-    pub fn new(
-        work: Work,
-        xnonce: &(Bytes, usize),
-        vermask: u32,
-        has_new_work: Arc<Mutex<Option<()>>>,
-    ) -> Self {
-        has_new_work.lock().unwrap().take();
+    pub fn new(work: Work, xnonce: &(Bytes, usize), vermask: u32, work_notify: Notify) -> Self {
+        work_notify.notified();
         Self {
             work,
             xnonce1: Bytes::from(xnonce.0.as_ref()),
             xnonce2_size: xnonce.1,
             vermask,
             counter: BigUint::from(0u32),
-            has_new_work,
+            work_notify,
         }
     }
 
     fn next(&mut self) -> Option<Subwork2> {
-        if self.has_new_work.lock().unwrap().take().is_some() {
+        if self.work_notify.notified() {
             return None;
         }
 

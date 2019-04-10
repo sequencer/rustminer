@@ -3,14 +3,13 @@
 
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bytes::Bytes;
-use futures::future::{loop_fn, Loop};
 use serde_json::json;
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
-use tokio::timer::{Delay, Interval};
+use tokio::timer::Interval;
 
 pub mod stratum;
 pub mod util;
@@ -49,7 +48,7 @@ fn main_loop() {
     let ws = WorkStream(pool.work_channel.1);
     let xnonce = pool.xnonce.clone();
     let vermask = pool.vermask.clone();
-    let has_new_work = pool.has_new_work.clone();
+    let work_notify = pool.work_notify.clone();
 
     let mut fpga_writer = fpga::writer();
     fpga_writer.enable_sender(5);
@@ -57,29 +56,22 @@ fn main_loop() {
 
     let send_to_fpga = ws.for_each(|w| {
         let fpga_writer = fpga_writer.clone();
-        let has_new_work = has_new_work.clone();
+        let work_notify = work_notify.clone();
 
         Subwork2Maker::new(
             w,
             &xnonce.lock().unwrap(),
             vermask.lock().unwrap().unwrap(),
-            has_new_work.clone(),
+            work_notify.clone(),
         )
         .for_each(move |sw2| {
             // dbg!(&sw2);
             fpga_writer.lock().unwrap().writer_subwork2(sw2);
 
-            loop_fn(has_new_work.clone(), |has_new_work| {
-                Delay::new(Instant::now() + Duration::from_millis(100)).then(|_| {
-                    if has_new_work.lock().unwrap().is_some() {
-                        Result::<_, ()>::Ok(Loop::Break(has_new_work))
-                    } else {
-                        Ok(Loop::Continue(has_new_work))
-                    }
-                })
-            })
-            .timeout(Duration::from_secs(10))
-            .then(|_| Ok(()))
+            work_notify
+                .clone()
+                .timeout(Duration::from_secs(10))
+                .then(|_| Ok(()))
         })
         .then(|_| Ok(()))
     });
