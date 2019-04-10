@@ -28,7 +28,6 @@ fn main_loop() {
     let connect_pool = pool.connect();
 
     let exts = vec![
-        String::from("minimum-difficulty"),
         String::from("version-rolling"),
     ];
     let ext_params = json!({
