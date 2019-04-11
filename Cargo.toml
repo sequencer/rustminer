@@ -18,3 +18,4 @@ libc = "0.2.49"
 i2c-linux = "0.1.2"
 crc_all = "0.1.0"
 sha256 = { git = "https://github.com/nanpuyue/sha256" }
+tokio-uio = { git = "https://github.com/nanpuyue/tokio-uio" }
