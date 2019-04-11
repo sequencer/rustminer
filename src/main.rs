@@ -11,6 +11,9 @@ use tokio::prelude::*;
 use tokio::runtime::current_thread;
 use tokio::timer::Interval;
 
+#[macro_use]
+extern crate log;
+
 pub mod stratum;
 pub mod util;
 pub mod work;
@@ -91,7 +94,6 @@ fn main_loop() {
             };
 
             let fpga_writer = fpga_writer.clone();
-            eprint!("received: {}", received.to_hex());
             let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
             let version_count =
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
@@ -104,7 +106,7 @@ fn main_loop() {
                     if target.starts_with(b"\0\0\0\0") {
                         offset = i;
                         let diff = Subwork2::target_diff(&target);
-                        eprintln!(", difficulty: {}", diff);
+                        debug!("received: {}, difficulty: {:0<18}", received.to_hex(), diff);
                         if diff >= *pool_diff.lock().unwrap() {
                             let params = sw2.into_params("h723n8m.001", &nonce, version_bits);
                             let msg = Action {
@@ -114,14 +116,18 @@ fn main_loop() {
                             };
                             let data = msg.to_string().unwrap();
                             tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
-                            println!("submit nonce: 0x{} (difficulty: {})", nonce.to_hex(), diff);
+                            info!("submit nonce: 0x{} (difficulty: {:0<18})", nonce.to_hex(), diff);
                         };
                         return Ok(());
                     }
                 }
             }
             let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0b00011111;
-            eprintln!(", lost, crc check: {}", crc_check);
+            debug!(
+                "received: {}, lost, crc check: {}",
+                received.to_hex(),
+                crc_check
+            );
             Ok(())
         });
 
@@ -130,6 +136,8 @@ fn main_loop() {
 }
 
 fn main() {
+    util::setup_logger().unwrap();
+
     loop {
         main_loop();
     }

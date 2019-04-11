@@ -16,13 +16,13 @@ impl Pool {
                             let work_notify = work_notify.clone();
                             tokio::spawn(work_sender.clone().send(w).then(move |_| {
                                 work_notify.notify();
-                                println!("=> received new work!");
+                                info!("=> received new work!");
                                 Ok(())
                             }));
                         }
                         Params::Num([n]) => {
                             if s.method.as_str() == "mining.set_difficulty" {
-                                println!("=> set difficulty: {}!", &n);
+                                info!("=> set difficulty: {}!", &n);
                                 *diff.lock().unwrap() = n;
                             }
                         }
@@ -31,10 +31,10 @@ impl Pool {
                                 let mut vermask = vermask.lock().unwrap();
                                 let mask = tmask.0[0];
                                 *vermask = Some(mask);
-                                println!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
+                                info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
                             }
                         }
-                        _ => println!("=> {}: {:?}", s.method, s.params),
+                        _ => info!("=> {}: {:?}", s.method, s.params),
                     }
                 } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
                     match s.result {
@@ -46,16 +46,16 @@ impl Pool {
                             };
 
                             if r {
-                                println!("=> {} successfully!", action);
+                                info!("=> {} successfully!", action);
                             } else {
-                                println!("=> {} failed!", action);
+                                info!("=> {} failed!", action);
                             }
                         }
                         ResultOf::Subscribe(r) => {
                             let mut xnonce = xnonce.lock().unwrap();
                             xnonce.0 = r.1;
                             xnonce.1 = r.2;
-                            println!(
+                            info!(
                                 "=> set xnonce1: 0x{}, xnonce2_size: {}!",
                                 xnonce.0.to_hex(),
                                 xnonce.1
@@ -70,18 +70,12 @@ impl Pool {
                                             hex_to::u32(r.get("version-rolling.mask").unwrap())
                                                 .unwrap();
                                         *vermask = Some(mask);
-                                        println!(
-                                            "=> set vermask: 0x{}!",
-                                            mask.to_be_bytes().to_hex()
-                                        );
+                                        info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
                                     } else {
-                                        println!("=> the pool does not support version-rolling!");
+                                        info!("=> the pool does not support version-rolling!");
                                     }
                                 } else if let serde_json::Value::String(e) = result {
-                                    println!(
-                                        "=> the pool does not support version-rolling: {:?}!",
-                                        e
-                                    );
+                                    info!("=> the pool does not support version-rolling: {:?}!", e);
                                 }
                             }
                         }

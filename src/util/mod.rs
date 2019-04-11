@@ -113,3 +113,21 @@ pub mod hex_to {
         Ok(uv)
     }
 }
+
+pub fn setup_logger() -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{:<5}] {}",
+                chrono::Local::now().format("[%Y-%m-%d %H:%M:%S]"),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .level_for("tokio_reactor", log::LevelFilter::Info)
+        .chain(std::io::stdout())
+        .chain(fern::log_file("/tmp/stratum.log")?)
+        .apply()?;
+    Ok(())
+}

@@ -101,7 +101,7 @@ impl Pool {
         let reader = stream
             .inspect(move |_| *last_active.lock().unwrap() = Ok(Instant::now()))
             .for_each(move |line| {
-                dbg!(&line);
+                debug!("recv: {:?}", &line);
                 let send = reader_tx.clone().send(line).then(|_| Ok(()));
                 tokio::spawn(send);
                 Ok(())
@@ -113,7 +113,7 @@ impl Pool {
         let writer = writer_rx
             .map_err(|_| io::Error::from(io::ErrorKind::Other))
             .inspect(move |s| {
-                dbg!(s);
+                debug!("send: {:?}", s);
             })
             .forward(SinkHook::new(sink, move || {
                 *last_active.lock().unwrap() = Ok(Instant::now());

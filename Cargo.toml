@@ -17,5 +17,8 @@ futures = "0.1.25"
 libc = "0.2.49"
 i2c-linux = "0.1.2"
 crc_all = "0.1.0"
+fern = "0.5.8"
+log = "0.4.6"
+chrono = "0.4.6"
 sha256 = { git = "https://github.com/nanpuyue/sha256" }
 tokio-uio = { git = "https://github.com/nanpuyue/tokio-uio" }

@@ -14,6 +14,7 @@ use tokio::runtime::current_thread;
 use tokio_uio::Uio;
 
 use super::Mmap;
+use crate::util::hex::ToHex;
 use crate::work::Subwork2;
 
 static mut UIO_MMAP: Mmap = unsafe { Mmap::uninitialized() };
@@ -192,11 +193,10 @@ impl Writer {
         self.subworks.truncate(2);
 
         // debug
-        print!("write work: ");
-        for b in self.data.read(0, 80) {
-            print!("{:02x}", b);
-        }
-        println!();
+        debug!(
+            "written work: {}",
+            self.data.read(0, 80).collect::<Vec<u8>>().to_hex()
+        );
     }
 
     pub fn enable_sender(&mut self, board: usize) {

@@ -15,7 +15,7 @@ impl Pool {
             .for_each(move |x| match *last_active.lock().unwrap() {
                 Ok(t) if t + timeout >= x => Ok(()),
                 _ => {
-                    eprintln!("pool connect timeout!");
+                    error!("pool connect timeout!");
                     let _ = tcpstream.shutdown(Shutdown::Both);
                     Err(Error::shutdown())
                 }
