@@ -29,6 +29,7 @@ use self::work::*;
 fn main_loop() {
     let mut pool = Pool::new("121.29.19.24:443");
     let connect_pool = pool.connect();
+    let checker = pool.checker();
 
     let exts = vec![String::from("version-rolling")];
     let ext_params = json!({
@@ -132,7 +133,10 @@ fn main_loop() {
         });
 
     let mut runtime = current_thread::Runtime::new().unwrap();
-    let _ = runtime.block_on(connect_pool.join(send_to_board).join(receive_nonce));
+    let task = connect_pool
+        .join3(send_to_board, receive_nonce)
+        .then(|_| Ok(()));
+    drop(runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(()))));
 }
 
 fn main() {

@@ -109,20 +109,17 @@ impl Pool {
             .map_err(|_| ());
         let reader = reader.join(self.reader());
 
-        let last_active = self.last_active.clone();
         let writer = writer_rx
             .map_err(|_| io::Error::from(io::ErrorKind::Other))
             .inspect(move |s| {
                 debug!("send: {:?}", s);
             })
             .forward(SinkHook::new(sink, move || {
-                *last_active.lock().unwrap() = Ok(Instant::now());
+                debug!("data sent!");
             }))
             .map_err(|_| ());
 
-        let checker = self.checker();
-
-        checker.join3(reader, writer).then(|_| Ok(()))
+        reader.join(writer).then(|_| Ok(()))
     }
 
     pub fn sender(&mut self) -> Sender<String> {
