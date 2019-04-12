@@ -96,11 +96,7 @@ fn main_loop() {
     });
 
     let mut offset = 0;
-    let receive_nonce = nonce_receiver.map_err(|_| ()).for_each(|received| {
-        if pool_sender.is_closed() {
-            return Err(());
-        };
-
+    let receive_nonce = nonce_receiver.for_each(|received| {
         let fpga_writer = fpga_writer.clone();
         let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
         let version_count =
