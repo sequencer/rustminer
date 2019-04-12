@@ -103,7 +103,13 @@ fn main_loop() {
                 u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
                     - u32::from((received[7] - received[5]) & 0x7f);
 
-            for sw2 in fpga_writer.lock().unwrap().subworks() {
+            let subworks = fpga_writer.lock().unwrap().subworks();
+            if subworks.is_empty() {
+                debug!("received: {}, but there is no subwork!", received.to_hex());
+                return Ok(());
+            }
+
+            for sw2 in subworks {
                 for i in (offset..16).chain(0..offset) {
                     let version_bits = fpga::version_bits(sw2.vermask, version_count - i);
                     let target = sw2.target(&nonce, version_bits);
@@ -130,6 +136,7 @@ fn main_loop() {
                     }
                 }
             }
+
             let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0x1f;
             debug!(
                 "received: {}, lost, crc check: {}",
