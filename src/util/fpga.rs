@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::io::Error;
 use std::sync::Once;
 use std::thread;
 use std::time::Duration;
@@ -7,9 +6,8 @@ use std::time::Duration;
 use bytes::Bytes;
 use crc_all::CrcAlgo;
 use futures::sync::mpsc::{channel, Receiver};
-use futures::{Async, Future, Poll, Sink, Stream};
+use futures::{Future, Sink, Stream};
 use lazy_static::lazy_static;
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::runtime::current_thread;
 use tokio_uio::Uio;
 
@@ -210,55 +208,6 @@ impl Writer {
     }
 }
 
-struct UioReader {
-    inner: Uio,
-}
-
-struct UioWriter<'a> {
-    inner: &'a mut Uio,
-    buf: &'a [u8],
-}
-
-impl<'a> Future for UioWriter<'a> {
-    type Item = usize;
-    type Error = Error;
-
-    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        self.inner.poll_write(self.buf)
-    }
-}
-
-impl Default for UioReader {
-    fn default() -> Self {
-        Self {
-            inner: Uio::open("/dev/uio0").expect("can't open /dev/uio0!"),
-        }
-    }
-}
-
-impl UioReader {
-    fn enable(&mut self) -> UioWriter {
-        const ENABLE_INTERRUPT: [u8; 4] = 1u32.to_ne_bytes();
-        UioWriter {
-            inner: &mut self.inner,
-            buf: &ENABLE_INTERRUPT,
-        }
-    }
-}
-
-impl Stream for UioReader {
-    type Item = usize;
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.enable().wait().unwrap();
-        self.inner
-            .poll_read(&mut [0; 4])
-            .map(|x| x.map(Some))
-            .map_err(|_| ())
-    }
-}
-
 impl Reader {
     pub fn receive_nonce(&mut self) -> Receiver<Bytes> {
         let (sender, receiver) = channel(32);
@@ -266,14 +215,12 @@ impl Reader {
         let mut csr_in = self.csr_in.take().unwrap();
 
         let reader = move || {
-            let read_nonce = UioReader::default().for_each(move |x| {
-                if x == 4 {
-                    let mut nonce = Bytes::with_capacity(12);
-                    nonce.extend(mmap.read(0, 12));
+            let read_nonce = Uio::open("/dev/uio0").unwrap().for_each(move |_| {
+                let mut nonce = Bytes::with_capacity(12);
+                nonce.extend(mmap.read(0, 12));
 
-                    sender.clone().send(nonce).wait().unwrap();
-                    csr_in.notify(3);
-                }
+                sender.clone().send(nonce).wait().unwrap();
+                csr_in.notify(3);
                 Ok(())
             });
 
