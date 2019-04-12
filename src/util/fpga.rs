@@ -8,7 +8,6 @@ use crc_all::CrcAlgo;
 use futures::sync::mpsc::{channel, Receiver};
 use futures::{Future, Sink, Stream};
 use lazy_static::lazy_static;
-use tokio::runtime::current_thread;
 use tokio_uio::Uio;
 
 use super::Mmap;
@@ -209,27 +208,24 @@ impl Writer {
 }
 
 impl Reader {
-    pub fn receive_nonce(&mut self) -> Receiver<Bytes> {
+    pub fn read_nonce(&mut self) -> (impl Future<Item = (), Error = ()> + Send, Receiver<Bytes>) {
         let (sender, receiver) = channel(32);
         let mut mmap = self.data.take().unwrap();
         let mut csr_in = self.csr_in.take().unwrap();
 
-        let reader = move || {
-            let read_nonce = Uio::open("/dev/uio0").unwrap().for_each(move |_| {
+        let nonce_reader = Uio::open("/dev/uio0")
+            .unwrap()
+            .for_each(move |_| {
                 let mut nonce = Bytes::with_capacity(12);
                 nonce.extend(mmap.read(0, 12));
 
                 sender.clone().send(nonce).wait().unwrap();
                 csr_in.notify(3);
                 Ok(())
-            });
+            })
+            .map_err(|_| ());
 
-            let mut runtime = current_thread::Runtime::new().unwrap();
-            let _ = runtime.block_on(read_nonce);
-        };
-        thread::spawn(reader);
-
-        receiver
+        (nonce_reader, receiver)
     }
 }
 

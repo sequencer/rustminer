@@ -3,6 +3,7 @@
 
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -86,69 +87,72 @@ fn main_loop() {
                 .map_err(|e| error!("send heart beat err: {}!", e))
         });
 
-    let send_to_board = send_heart_beat.join(send_to_fpga);
+    let (nonce_reader, nonce_receiver) = fpga::reader().read_nonce();
+    let task = nonce_reader.select(send_heart_beat);
+
+    thread::spawn(|| {
+        let mut runtime = current_thread::Runtime::new().unwrap();
+        let _ = runtime.block_on(task);
+    });
 
     let mut offset = 0;
-    let receive_nonce = fpga::reader()
-        .receive_nonce()
-        .map_err(|_| ())
-        .for_each(|received| {
-            if pool_sender.is_closed() {
-                return Err(());
-            };
+    let receive_nonce = nonce_receiver.map_err(|_| ()).for_each(|received| {
+        if pool_sender.is_closed() {
+            return Err(());
+        };
 
-            let fpga_writer = fpga_writer.clone();
-            let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
-            let version_count =
-                u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
-                    - u32::from((received[7] - received[5]) & 0x7f);
+        let fpga_writer = fpga_writer.clone();
+        let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
+        let version_count =
+            u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
+                - u32::from((received[7] - received[5]) & 0x7f);
 
-            let subworks = fpga_writer.lock().unwrap().subworks();
-            if subworks.is_empty() {
-                debug!("received: {}, but there is no subwork!", received.to_hex());
-                return Ok(());
-            }
+        let subworks = fpga_writer.lock().unwrap().subworks();
+        if subworks.is_empty() {
+            debug!("received: {}, but there is no subwork!", received.to_hex());
+            return Ok(());
+        }
 
-            for sw2 in subworks {
-                for i in (offset..16).chain(0..offset) {
-                    let version_bits = fpga::version_bits(sw2.vermask, version_count - i);
-                    let target = sw2.target(&nonce, version_bits);
-                    if target.starts_with(b"\0\0\0\0") {
-                        offset = i;
-                        let diff = Subwork2::target_diff(&target);
-                        debug!("received: {}, difficulty: {:0<18}", received.to_hex(), diff);
-                        if diff >= *pool_diff.lock().unwrap() {
-                            let params = sw2.into_params("h723n8m.001", &nonce, version_bits);
-                            let msg = Action {
-                                id: Some(4),
-                                method: String::from("mining.submit"),
-                                params,
-                            };
-                            let data = msg.to_string().unwrap();
-                            tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
-                            info!(
-                                "=> submit nonce: 0x{} (difficulty: {:0<18})",
-                                nonce.to_hex(),
-                                diff
-                            );
+        for sw2 in subworks {
+            for i in (offset..16).chain(0..offset) {
+                let version_bits = fpga::version_bits(sw2.vermask, version_count - i);
+                let target = sw2.target(&nonce, version_bits);
+                if target.starts_with(b"\0\0\0\0") {
+                    offset = i;
+                    let diff = Subwork2::target_diff(&target);
+                    debug!("received: {}, difficulty: {:0<18}", received.to_hex(), diff);
+                    if diff >= *pool_diff.lock().unwrap() {
+                        let params = sw2.into_params("h723n8m.001", &nonce, version_bits);
+                        let msg = Action {
+                            id: Some(4),
+                            method: String::from("mining.submit"),
+                            params,
                         };
-                        return Ok(());
-                    }
+                        let data = msg.to_string().unwrap();
+                        tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
+                        info!(
+                            "=> submit nonce: 0x{} (difficulty: {:0<18})",
+                            nonce.to_hex(),
+                            diff
+                        );
+                    };
+                    return Ok(());
                 }
             }
+        }
 
-            let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0x1f;
-            debug!(
-                "received: {}, lost, crc check: {}",
-                received.to_hex(),
-                crc_check
-            );
-            Ok(())
-        });
+        let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0x1f;
+        debug!(
+            "received: {}, lost, crc check: {}",
+            received.to_hex(),
+            crc_check
+        );
+        Ok(())
+    });
 
     let mut runtime = current_thread::Runtime::new().unwrap();
     let task = connect_pool
-        .join3(send_to_board, receive_nonce)
+        .join3(send_to_fpga, receive_nonce)
         .then(|_| Ok(()));
     let _ = runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
 }
