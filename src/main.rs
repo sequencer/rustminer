@@ -66,7 +66,7 @@ fn main_loop() {
             work_notify.clone(),
         )
         .for_each(move |sw2| {
-            // dbg!(&sw2);
+            //debug!("{:?}", &sw2);
             fpga_writer.lock().unwrap().writer_subwork2(sw2);
 
             work_notify
@@ -81,7 +81,10 @@ fn main_loop() {
     i2c.send_heart_beat(addr).unwrap();
     let send_heart_beat = Interval::new_interval(Duration::from_secs(10))
         .map_err(|_| ())
-        .for_each(move |_| i2c.send_heart_beat(addr).map_err(|e| eprintln!("{}", e)));
+        .for_each(move |_| {
+            i2c.send_heart_beat(addr)
+                .map_err(|e| error!("send heart beat err: {}!", e))
+        });
 
     let send_to_board = send_heart_beat.join(send_to_fpga);
 
@@ -117,13 +120,17 @@ fn main_loop() {
                             };
                             let data = msg.to_string().unwrap();
                             tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
-                            info!("submit nonce: 0x{} (difficulty: {:0<18})", nonce.to_hex(), diff);
+                            info!(
+                                "=> submit nonce: 0x{} (difficulty: {:0<18})",
+                                nonce.to_hex(),
+                                diff
+                            );
                         };
                         return Ok(());
                     }
                 }
             }
-            let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0b00011111;
+            let crc_check = fpga::crc5_false(&received[0..7], 5) == received[6] & 0x1f;
             debug!(
                 "received: {}, lost, crc check: {}",
                 received.to_hex(),
@@ -136,7 +143,7 @@ fn main_loop() {
     let task = connect_pool
         .join3(send_to_board, receive_nonce)
         .then(|_| Ok(()));
-    drop(runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(()))));
+    let _ = runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
 }
 
 fn main() {

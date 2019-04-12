@@ -77,7 +77,7 @@ impl SubworkMaker {
     fn next(&mut self) -> Option<Subwork> {
         if self.work_notify.notified() {
             if self.serial_cloned.clear(ClearBuffer::Output).is_ok() {
-                println!("serial buffer cleared!");
+                debug!("serial buffer cleared!");
             };
             return None;
         }

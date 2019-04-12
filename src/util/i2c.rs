@@ -38,7 +38,7 @@ pub enum Command {
 
 pub fn open<T: AsRef<Path>>(path: T) -> I2c {
     let device = File::open(&path)
-        .unwrap_or_else(|_| panic!(format!("can't open {} !", path.as_ref().display())));
+        .unwrap_or_else(|_| panic!(format!("can't open {}!", path.as_ref().display())));
 
     I2c::new(device)
 }

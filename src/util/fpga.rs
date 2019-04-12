@@ -254,7 +254,7 @@ impl Stream for UioReader {
         self.enable().wait().unwrap();
         self.inner
             .poll_read(&mut [0; 4])
-            .map(|x| x.map(|x| Some(x)))
+            .map(|x| x.map(Some))
             .map_err(|_| ())
     }
 }
@@ -278,7 +278,7 @@ impl Reader {
             });
 
             let mut runtime = current_thread::Runtime::new().unwrap();
-            drop(runtime.block_on(read_nonce));
+            let _ = runtime.block_on(read_nonce);
         };
         thread::spawn(reader);
 

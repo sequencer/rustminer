@@ -32,9 +32,8 @@ impl Stream for WorkStream {
         loop {
             match self.0.poll() {
                 Ok(Ready(w)) => {
-                    // debug
                     if let Ready(Some(work)) = item {
-                        println!("=> drop work (id: {})!", work.id);
+                        info!("=> drop work (id: {})!", work.id);
                     }
 
                     item = Async::Ready(w);
@@ -101,7 +100,7 @@ impl Pool {
         let reader = stream
             .inspect(move |_| *last_active.lock().unwrap() = Ok(Instant::now()))
             .for_each(move |line| {
-                debug!("recv: {:?}", &line);
+                debug!("recv: {}", &line);
                 let send = reader_tx.clone().send(line).then(|_| Ok(()));
                 tokio::spawn(send);
                 Ok(())
@@ -112,7 +111,7 @@ impl Pool {
         let writer = writer_rx
             .map_err(|_| io::Error::from(io::ErrorKind::Other))
             .inspect(move |s| {
-                debug!("send: {:?}", s);
+                debug!("send: {}", s);
             })
             .forward(SinkHook::new(sink, move || {
                 debug!("data sent!");

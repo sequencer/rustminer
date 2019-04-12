@@ -68,7 +68,7 @@ impl Decoder for Codec {
                         // process next nonce
                         if received.starts_with(&src[n..n + 5]) {
                             let _drop = src.split_to(n + 7);
-                            println!("duplicate data: 0x{}!", _drop.to_hex());
+                            debug!("duplicate data: 0x{}!", _drop.to_hex());
                             continue 'outer;
                         }
                     }
@@ -85,7 +85,7 @@ impl Decoder for Codec {
                             if let Some(ref sw) = &self.subworks[id.wrapping_sub(i) as usize] {
                                 target = sw.target(&nonce);
                                 if target.starts_with(b"\0\0\0\0") {
-                                    println!(
+                                    debug!(
                                         "received: 0x{}, id: {}, target: 0x{}",
                                         received.to_hex(),
                                         id,
@@ -101,8 +101,7 @@ impl Decoder for Codec {
                         self.received.truncate(2);
 
                         if subwork.is_none() {
-                            // debug
-                            println!(
+                            debug!(
                                 "lost the subwork of received data (id: {}): 0x{}",
                                 id,
                                 self.received.front().unwrap().to_hex()
