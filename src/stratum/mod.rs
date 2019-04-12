@@ -47,7 +47,6 @@ impl Stream for WorkStream {
 
 pub struct Pool {
     addr: String,
-    counter: u32,
     tcpstream: Option<std::net::TcpStream>,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
@@ -63,7 +62,6 @@ impl Pool {
     pub fn new(addr: &str) -> Self {
         Self {
             addr: String::from(addr),
-            counter: 0,
             tcpstream: None,
             reader: None,
             writer: None,
@@ -74,11 +72,6 @@ impl Pool {
             diff: Arc::new(Mutex::new(1.0)),
             last_active: Arc::new(Mutex::new(Ok(Instant::now()))),
         }
-    }
-
-    fn counter(&mut self) -> Option<u32> {
-        self.counter += 1;
-        Some(self.counter)
     }
 
     pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send {
@@ -137,7 +130,7 @@ impl Pool {
 
     pub fn subscribe(&mut self) {
         let msg = Action {
-            id: self.counter(),
+            id: Some(1),
             method: String::from("mining.subscribe"),
             params: Params::None(vec![]),
         };
@@ -146,7 +139,7 @@ impl Pool {
 
     pub fn authorize(&mut self, user: &str, pass: &str) {
         let msg = Action {
-            id: self.counter(),
+            id: Some(2),
             method: String::from("mining.authorize"),
             params: Params::User([String::from(user), String::from(pass)]),
         };
