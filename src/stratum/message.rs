@@ -43,8 +43,15 @@ pub struct Config(pub Vec<String>, pub serde_json::Value);
 #[serde(untagged)]
 pub enum ResultOf {
     Configure(serde_json::map::Map<String, serde_json::Value>),
-    Authorize(bool),
+    Authorize(BoolOrNull),
     Subscribe(ResultOfSubscribe),
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum BoolOrNull {
+    Bool(bool),
+    Null,
 }
 
 #[derive(Deserialize, Debug)]

@@ -39,16 +39,27 @@ impl Pool {
                 } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
                     match s.result {
                         ResultOf::Authorize(r) => {
-                            let action = match s.id {
-                                Some(2) => "authorized",
-                                Some(4) => "submit",
-                                _ => "unknown",
-                            };
+                            let (action, result);
+                            match s.id {
+                                Some(2) => {
+                                    action = "authorized";
+                                    result = ["successfully", "failed"];
+                                }
+                                Some(4) => {
+                                    action = "submitted nonce";
+                                    result = ["accepted", "rejected"];
+                                }
+                                _ => {
+                                    action = "unknown";
+                                    result = ["true", "false"];
+                                }
+                            }
 
-                            if r {
-                                info!("=> {} successfully!", action);
-                            } else {
-                                info!("=> {} failed!", action);
+                            match r {
+                                BoolOrNull::Bool(x) if x => {
+                                    info!("=> {} {}!", action, result[0])
+                                }
+                                _ => info!("=> {} {}!", action, result[1]),
                             }
                         }
                         ResultOf::Subscribe(r) => {
