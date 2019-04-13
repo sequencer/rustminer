@@ -1,24 +1,32 @@
-use std::net::Shutdown;
 use std::time::Duration;
 
-use tokio::timer::{Error, Interval};
+use futures::future::{loop_fn, Loop};
+use tokio::timer::Delay;
 
 use super::*;
 
 impl Pool {
     pub fn checker(&mut self) -> impl Future<Item = (), Error = ()> + Send {
-        let last_active = self.last_active.clone();
-        let tcpstream = self.tcpstream.as_ref().unwrap().try_clone().unwrap();
+        let interval = Duration::from_secs(1);
         let timeout = Duration::from_secs(60);
-        Interval::new_interval(Duration::from_secs(1))
-            .for_each(move |x| match *last_active.lock().unwrap() {
-                Ok(t) if t + timeout >= x => Ok(()),
-                _ => {
-                    error!("pool connect timeout!");
-                    let _ = tcpstream.shutdown(Shutdown::Both);
-                    Err(Error::shutdown())
-                }
-            })
-            .map_err(|_| ())
+
+        loop_fn(self.last_active.clone(), move |last_active| {
+            let start = Instant::now();
+            trace!("checker delay {:?}: {:?}", interval, start);
+
+            Delay::new(start + interval)
+                .map_err(|e| error!("checker delay err: {:?}", e))
+                .and_then(move |_| {
+                    let now = Instant::now();
+                    trace!("checker run: {:?}", now);
+
+                    if now > *last_active.lock().unwrap() + timeout {
+                        error!("pool connection timeout!");
+                        Ok(Loop::Break(()))
+                    } else {
+                        Ok(Loop::Continue(last_active))
+                    }
+                })
+        })
     }
 }

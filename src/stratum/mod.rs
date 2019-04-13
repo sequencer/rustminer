@@ -56,7 +56,7 @@ pub struct Pool {
     pub work_notify: Notify,
     pub vermask: Arc<Mutex<Option<u32>>>,
     pub diff: Arc<Mutex<f64>>,
-    pub last_active: Arc<Mutex<Result<Instant, io::Error>>>,
+    pub last_active: Arc<Mutex<Instant>>,
 }
 
 impl Pool {
@@ -71,7 +71,7 @@ impl Pool {
             work_notify: Notify::default(),
             vermask: Arc::new(Mutex::new(None)),
             diff: Arc::new(Mutex::new(1.0)),
-            last_active: Arc::new(Mutex::new(Ok(Instant::now()))),
+            last_active: Arc::new(Mutex::new(Instant::now())),
         }
     }
 
@@ -92,7 +92,10 @@ impl Pool {
 
         let last_active = self.last_active.clone();
         let reader = stream
-            .inspect(move |_| *last_active.lock().unwrap() = Ok(Instant::now()))
+            .inspect(move |_| {
+                trace!("update last_active");
+                *last_active.lock().unwrap() = Instant::now();
+            })
             .for_each(move |line| {
                 debug!("recv: {}", &line);
                 let send = reader_tx
