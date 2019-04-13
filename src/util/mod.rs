@@ -2,6 +2,8 @@ use std::iter::repeat;
 use std::iter::FromIterator;
 
 use bytes::{Bytes, BytesMut};
+use chrono::Local;
+use fern::{Dispatch, InitError};
 use sha256::Sha256;
 
 pub mod fpga;
@@ -114,12 +116,12 @@ pub mod hex_to {
     }
 }
 
-pub fn setup_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
+pub fn setup_logger() -> Result<(), InitError> {
+    Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
                 "{}[{:<5}] {}",
-                chrono::Local::now().format("[%Y-%m-%d %H:%M:%S]"),
+                Local::now().format("[%Y-%m-%d %H:%M:%S]"),
                 record.level(),
                 message
             ))
@@ -127,7 +129,10 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
         .level(log::LevelFilter::Debug)
         .level_for("tokio_reactor", log::LevelFilter::Info)
         .chain(std::io::stdout())
-        .chain(fern::log_file("/tmp/stratum.log")?)
+        .chain(fern::log_file(format!(
+            "/var/log/stratum_{}.log",
+            Local::now().format("%Y%m%d_%H%M%S")
+        ))?)
         .apply()?;
     Ok(())
 }
