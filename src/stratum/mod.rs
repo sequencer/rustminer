@@ -94,11 +94,15 @@ impl Pool {
             .inspect(move |_| *last_active.lock().unwrap() = Ok(Instant::now()))
             .for_each(move |line| {
                 debug!("recv: {}", &line);
-                let send = reader_tx.clone().send(line).then(|_| Ok(()));
+                let send = reader_tx
+                    .clone()
+                    .send(line)
+                    .map(drop)
+                    .map_err(|e| error!("send recv data to channel err: {:?}", e));
                 tokio::spawn(send);
                 Ok(())
             })
-            .map_err(|_| ());
+            .map_err(|e| error!("recv from pool err: {:?}", e));
         let reader = reader.join(self.reader());
 
         let writer = writer_rx
@@ -109,7 +113,7 @@ impl Pool {
             .forward(SinkHook::new(sink, move || {
                 debug!("data sent!");
             }))
-            .map_err(|_| ());
+            .map_err(|e| error!("send to pool err: {:?}", e));
 
         reader.join(writer).then(|_| Ok(()))
     }

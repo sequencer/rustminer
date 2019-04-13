@@ -189,7 +189,6 @@ impl Writer {
         self.subworks.push_front(sw2);
         self.subworks.truncate(2);
 
-        // debug
         debug!(
             "written work: {}",
             self.data.read(0, 80).collect::<Vec<u8>>().to_hex()
@@ -214,16 +213,22 @@ impl Reader {
         let mut csr_in = self.csr_in.take().unwrap();
 
         let nonce_reader = Uio::open("/dev/uio0")
-            .unwrap()
+            .expect("open /dev/uio0 err!")
             .for_each(move |_| {
                 let mut nonce = Bytes::with_capacity(12);
                 nonce.extend(mmap.read(0, 12));
 
-                sender.clone().send(nonce).wait().unwrap();
+                tokio::spawn(
+                    sender
+                        .clone()
+                        .send(nonce)
+                        .map(drop)
+                        .map_err(|e| error!("send nonce err: {:?}", e)),
+                );
                 csr_in.notify(3);
                 Ok(())
             })
-            .map_err(|_| ());
+            .map_err(|e| error!("read nonce err: {:?}", e));
 
         (nonce_reader, receiver)
     }
