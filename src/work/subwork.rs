@@ -4,9 +4,10 @@ use futures::{Async, Poll};
 use num_traits::cast::ToPrimitive;
 use tokio_serial::{ClearBuffer, SerialPort};
 
-use super::*;
 use crate::stratum::Params;
 use crate::util::ToHex;
+
+use super::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct Subwork {

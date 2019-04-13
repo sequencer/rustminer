@@ -54,7 +54,8 @@ impl Default for Codec {
 }
 
 impl Decoder for Codec {
-    type Item = (Subwork, Bytes, Bytes); // (subwork, nonce, target)
+    // (subwork, nonce, target)
+    type Item = (Subwork, Bytes, Bytes);
     type Error = io::Error;
 
     fn decode(

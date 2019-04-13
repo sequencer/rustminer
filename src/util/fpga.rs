@@ -10,9 +10,9 @@ use futures::{Future, Sink, Stream};
 use lazy_static::lazy_static;
 use tokio_uio::Uio;
 
-use super::Mmap;
-use crate::util::hex::ToHex;
 use crate::work::Subwork2;
+
+use super::{Mmap, ToHex};
 
 static mut UIO_MMAP: Mmap = unsafe { Mmap::uninitialized() };
 

@@ -38,7 +38,7 @@ impl Mmap {
 
         let ptr = unsafe {
             libc::mmap(
-                std::ptr::null_mut(),
+                null_mut(),
                 size,
                 libc::PROT_READ | libc::PROT_WRITE,
                 libc::MAP_SHARED,

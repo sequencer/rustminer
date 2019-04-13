@@ -1,11 +1,12 @@
+use bytes::BytesMut;
 use futures::stream::Stream;
 use futures::{Async, Poll};
 use num_traits::cast::ToPrimitive;
 
-use super::*;
 use crate::stratum::Params;
 use crate::util::ToHex;
-use bytes::BytesMut;
+
+use super::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct Subwork2 {

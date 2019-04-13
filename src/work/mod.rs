@@ -2,14 +2,15 @@ use bytes::Bytes;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
+use super::util::*;
+
+pub use self::subwork::*;
+pub use self::subwork2::*;
+
 mod subwork;
 mod subwork2;
 #[cfg(test)]
 mod tests;
-
-pub use self::subwork::*;
-pub use self::subwork2::*;
-use super::util::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Work {

@@ -1,5 +1,6 @@
-use super::*;
 use crate::util::{hex_to, ToHex};
+
+use super::*;
 
 impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
@@ -56,9 +57,7 @@ impl Pool {
                             }
 
                             match r {
-                                BoolOrNull::Bool(x) if x => {
-                                    info!("=> {} {}!", action, result[0])
-                                }
+                                BoolOrNull::Bool(x) if x => info!("=> {} {}!", action, result[0]),
                                 _ => info!("=> {} {}!", action, result[1]),
                             }
                         }

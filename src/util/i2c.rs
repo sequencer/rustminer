@@ -5,9 +5,9 @@ use std::path::Path;
 
 use i2c_linux::{Message, ReadFlags, WriteFlags};
 
-pub type I2c = i2c_linux::I2c<File>;
-
 use self::Command::*;
+
+pub type I2c = i2c_linux::I2c<File>;
 
 #[allow(non_camel_case_types)]
 pub enum Command {

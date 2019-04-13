@@ -11,14 +11,15 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
 
-pub mod checker;
-mod message;
-mod reader;
-
-pub use self::message::*;
 use super::util::Notify;
 use super::util::SinkHook;
 use super::work::*;
+
+pub use self::message::*;
+
+pub mod checker;
+mod message;
+mod reader;
 
 #[derive(Debug)]
 pub struct WorkStream(pub Receiver<Work>);

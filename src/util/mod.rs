@@ -6,6 +6,13 @@ use chrono::Local;
 use fern::{Dispatch, InitError};
 use sha256::Sha256;
 
+pub use self::{
+    hex::{FromHex, ToHex},
+    mmap::Mmap,
+    notify::Notify,
+    sinkhook::SinkHook,
+};
+
 pub mod fpga;
 pub mod hex;
 pub mod i2c;
@@ -13,13 +20,6 @@ mod mmap;
 mod notify;
 pub mod serial;
 mod sinkhook;
-
-pub use self::{
-    hex::{FromHex, ToHex},
-    mmap::Mmap,
-    notify::Notify,
-    sinkhook::SinkHook,
-};
 
 trait __Flip32: Sized {
     fn __flip32(&mut self);
@@ -84,8 +84,9 @@ pub fn sha256_midstate(data: &[u8]) -> Bytes {
 }
 
 pub mod hex_to {
-    use super::*;
     use serde::{de, Deserialize, Deserializer};
+
+    use super::*;
 
     pub fn bytes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Bytes, D::Error> {
         let s: &str = Deserialize::deserialize(deserializer)?;

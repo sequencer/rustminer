@@ -1,6 +1,9 @@
 #![feature(const_int_conversion)]
 #![allow(clippy::unreadable_literal)]
 
+#[macro_use]
+extern crate log;
+
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -12,13 +15,6 @@ use tokio::prelude::*;
 use tokio::runtime::current_thread;
 use tokio::timer::Interval;
 
-#[macro_use]
-extern crate log;
-
-pub mod stratum;
-pub mod util;
-pub mod work;
-
 use self::stratum::*;
 use self::util::{
     fpga,
@@ -26,6 +22,10 @@ use self::util::{
     ToHex,
 };
 use self::work::*;
+
+pub mod stratum;
+pub mod util;
+pub mod work;
 
 fn main_loop() {
     let mut pool = Pool::new("121.29.19.24:443");
