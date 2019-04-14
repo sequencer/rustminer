@@ -6,7 +6,6 @@ use futures::stream::Stream;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async::*, Future, Poll};
 use tokio::codec::{Decoder, LinesCodec};
-use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
@@ -92,32 +91,18 @@ impl Pool {
 
         let last_active = self.last_active.clone();
         let reader = stream
-            .inspect(move |_| {
-                trace!("update last_active");
+            .inspect(move |line| {
+                debug!("recv: {}", line);
                 *last_active.lock().unwrap() = Instant::now();
             })
-            .for_each(move |line| {
-                debug!("recv: {}", &line);
-                let send = reader_tx
-                    .clone()
-                    .send(line)
-                    .map(drop)
-                    .map_err(|e| error!("send recv data to channel err: {:?}", e));
-                tokio::spawn(send);
-                Ok(())
-            })
-            .map_err(|e| error!("recv from pool err: {:?}", e));
-        let reader = reader.join(self.reader());
+            .map_err(|e| error!("recv from pool err: {:?}", e))
+            .forward(reader_tx.sink_map_err(|e| error!("send data to channel err: {:?}", e)));
+        let reader = reader.select2(self.reader());
 
-        let writer = writer_rx
-            .map_err(|_| io::Error::from(io::ErrorKind::Other))
-            .inspect(move |s| {
-                debug!("send: {}", s);
-            })
-            .forward(SinkHook::new(sink, move || {
-                debug!("data sent!");
-            }))
-            .map_err(|e| error!("send to pool err: {:?}", e));
+        let writer = writer_rx.inspect(|line| debug!("send: {}", line)).forward(
+            SinkHook::new(sink, || debug!("data sent!"))
+                .sink_map_err(|e| error!("send to pool err: {:?}", e)),
+        );
 
         reader.select2(writer).map(drop).map_err(drop)
     }
