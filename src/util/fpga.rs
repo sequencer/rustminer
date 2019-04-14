@@ -42,8 +42,8 @@ pub struct Writer {
 }
 
 pub struct Reader {
-    data: Option<Mmap>,
-    csr_in: Option<Csr>,
+    data: Mmap,
+    csr_in: Csr,
 }
 
 pub struct SerialSender {
@@ -65,8 +65,8 @@ pub fn writer() -> Writer {
 
 pub fn reader() -> Reader {
     Reader {
-        data: Some(mmap(148, 13)),
-        csr_in: Some(Csr::new(mmap(80, 1))),
+        data: mmap(148, 13),
+        csr_in: Csr::new(mmap(80, 1)),
     }
 }
 
@@ -207,28 +207,24 @@ impl Writer {
 }
 
 impl Reader {
-    pub fn read_nonce(&mut self) -> (impl Future<Item = (), Error = ()> + Send, Receiver<Bytes>) {
+    pub fn read_nonce(mut self) -> (impl Future<Item = (), Error = ()> + Send, Receiver<Bytes>) {
         let (sender, receiver) = channel(32);
-        let mut mmap = self.data.take().unwrap();
-        let mut csr_in = self.csr_in.take().unwrap();
 
         let nonce_reader = Uio::open("/dev/uio0")
             .expect("open /dev/uio0 err!")
-            .for_each(move |_| {
-                let mut nonce = Bytes::with_capacity(12);
-                nonce.extend(mmap.read(0, 12));
+            .map(move |n| {
+                trace!("received interrupt: {}!", n);
 
-                tokio::spawn(
-                    sender
-                        .clone()
-                        .send(nonce)
-                        .map(drop)
-                        .map_err(|e| error!("send nonce err: {:?}", e)),
-                );
-                csr_in.notify(3);
-                Ok(())
+                let mut nonce = Bytes::with_capacity(12);
+                nonce.extend(self.data.read(0, 12));
+                self.csr_in.notify(3);
+
+                trace!("read from fpga: {}", nonce.to_hex());
+                nonce
             })
-            .map_err(|e| error!("read nonce err: {:?}", e));
+            .map_err(|e| error!("read nonce from fpga err: {:?}", e))
+            .forward(sender.sink_map_err(|e| error!("send nonce to channel err: {:?}", e)))
+            .map(drop);
 
         (nonce_reader, receiver)
     }
