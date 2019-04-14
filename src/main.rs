@@ -6,14 +6,13 @@ extern crate log;
 
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::thread::{self, sleep};
 use std::time::Duration;
 
 use bytes::Bytes;
 use serde_json::json;
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
-use tokio::timer::Interval;
 
 use self::stratum::*;
 use self::util::{
@@ -77,22 +76,11 @@ fn main_loop() {
         })
     });
 
-    let mut i2c = i2c::open("/dev/i2c-0");
-    let addr = 0x55;
-    i2c.send_heart_beat(addr).unwrap();
-    let send_heart_beat = Interval::new_interval(Duration::from_secs(10))
-        .map_err(|_| ())
-        .for_each(move |_| {
-            i2c.send_heart_beat(addr)
-                .map_err(|e| error!("send heart beat err: {}!", e))
-        });
-
     let (nonce_reader, nonce_receiver) = fpga::reader().read_nonce();
-    let task = nonce_reader.select(send_heart_beat);
 
     thread::spawn(|| {
         let mut runtime = current_thread::Runtime::new().unwrap();
-        let _ = runtime.block_on(task);
+        let _ = runtime.block_on(nonce_reader);
     });
 
     let mut offset = 0;
@@ -155,6 +143,15 @@ fn main_loop() {
 
 fn main() {
     util::setup_logger().unwrap();
+
+    thread::spawn(|| {
+        let mut i2c = i2c::open("/dev/i2c-0");
+        let addr = 0x55;
+        loop {
+            i2c.send_heart_beat(addr).expect("send heart beat err!");
+            sleep(Duration::from_secs(10));
+        }
+    });
 
     loop {
         main_loop();
