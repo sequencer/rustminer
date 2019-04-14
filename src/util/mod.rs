@@ -127,8 +127,8 @@ pub fn setup_logger() -> Result<(), InitError> {
                 message
             ))
         })
-        .level(log::LevelFilter::Debug)
-        .level_for("tokio_reactor", log::LevelFilter::Info)
+        .level(log::LevelFilter::Info)
+        .level_for("stratum", log::LevelFilter::Debug)
         .chain(std::io::stdout())
         .chain(fern::log_file(format!(
             "/var/log/stratum_{}.log",
