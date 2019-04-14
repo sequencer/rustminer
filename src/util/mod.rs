@@ -122,7 +122,7 @@ pub fn setup_logger() -> Result<(), InitError> {
         .format(|out, message, record| {
             out.finish(format_args!(
                 "{}[{:<5}] {}",
-                Local::now().format("[%Y-%m-%d %H:%M:%S]"),
+                Local::now().format("[%Y-%m-%d %H:%M:%S%.6f]"),
                 record.level(),
                 message
             ))
