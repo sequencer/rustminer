@@ -12,7 +12,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use serde_json::json;
 use tokio::prelude::*;
-use tokio::runtime::current_thread;
+//use tokio::runtime::current_thread;
 
 use self::stratum::*;
 use self::util::{
@@ -55,8 +55,9 @@ fn main_loop() {
     fpga_writer.enable_sender(5);
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
-    let send_to_fpga = ws.for_each(|w| {
-        let fpga_writer = fpga_writer.clone();
+    let fpga_writer_clone = fpga_writer.clone();
+    let send_to_fpga = ws.for_each(move |w| {
+        let fpga_writer = fpga_writer_clone.clone();
         let work_notify = work_notify.clone();
 
         Subwork2Maker::new(
@@ -78,13 +79,13 @@ fn main_loop() {
 
     let (nonce_reader, nonce_receiver) = fpga::reader().read_nonce();
 
-    thread::spawn(|| {
-        let mut runtime = current_thread::Runtime::new().unwrap();
-        let _ = runtime.block_on(nonce_reader);
-    });
+    //thread::spawn(|| {
+    //    let mut runtime = current_thread::Runtime::new().unwrap();
+    //    let _ = runtime.block_on(nonce_reader);
+    //});
 
     let mut offset = 0;
-    let receive_nonce = nonce_receiver.for_each(|received| {
+    let receive_nonce = nonce_receiver.for_each(move |received| {
         let fpga_writer = fpga_writer.clone();
         let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
         let version_count =
@@ -134,11 +135,12 @@ fn main_loop() {
         Ok(())
     });
 
-    let mut runtime = current_thread::Runtime::new().unwrap();
+    //let mut runtime = current_thread::Runtime::new().unwrap();
     let task = connect_pool
-        .join3(send_to_fpga, receive_nonce)
+        .join4(send_to_fpga, receive_nonce, nonce_reader)
         .then(|_| Ok(()));
-    let _ = runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
+    //let _ = runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
+    tokio::run(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
 }
 
 fn main() {
