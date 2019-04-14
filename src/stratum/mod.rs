@@ -119,7 +119,7 @@ impl Pool {
             }))
             .map_err(|e| error!("send to pool err: {:?}", e));
 
-        reader.join(writer).then(|_| Ok(()))
+        reader.select2(writer).map(drop).map_err(drop)
     }
 
     pub fn sender(&mut self) -> Sender<String> {

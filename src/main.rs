@@ -137,10 +137,14 @@ fn main_loop() {
 
     //let mut runtime = current_thread::Runtime::new().unwrap();
     let task = connect_pool
-        .join4(send_to_fpga, receive_nonce, nonce_reader)
-        .then(|_| Ok(()));
-    //let _ = runtime.block_on(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
-    tokio::run(checker.select(task).then(|_| Result::<_, ()>::Ok(())));
+        .select2(send_to_fpga)
+        .select2(receive_nonce)
+        .select2(nonce_reader)
+        .select2(checker)
+        .map(drop)
+        .map_err(drop);
+    //let _ = runtime.block_on(task);
+    tokio::run(task);
 }
 
 fn main() {
