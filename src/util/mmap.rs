@@ -51,9 +51,29 @@ impl Mmap {
 
     pub fn write<T: AsRef<[u8]>>(&mut self, offset: usize, data: T) {
         let data = data.as_ref();
-        assert!(offset + data.len() <= self.size);
+        debug_assert!(offset + data.len() <= self.size);
         for (i, v) in data.iter().enumerate() {
             unsafe { self.ptr.add(offset + i).write_volatile(*v) }
+        }
+    }
+
+    #[allow(clippy::cast_ptr_alignment)]
+    pub unsafe fn write_u32(&mut self, offset: usize, value: u32) {
+        debug_assert!(offset + 4 <= self.size);
+        (self.ptr.add(offset) as *mut u32).write_volatile(value)
+    }
+
+    pub unsafe fn write_as_u32<T: AsRef<[u8]>>(&mut self, mut offset: usize, data: T) {
+        let data = data.as_ref();
+        let len = data.len();
+        debug_assert!(len >= 4 && offset + len <= self.size);
+        debug_assert_eq!(len & 0b11, 0);
+        for v in data.iter().step_by(4) {
+            self.write_u32(
+                offset,
+                u32::from_ne_bytes(*((v as *const u8) as *const [u8; 4])),
+            );
+            offset += 4;
         }
     }
 

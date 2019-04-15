@@ -175,16 +175,18 @@ impl Csr {
 
 impl Writer {
     pub fn writer_subwork2(&mut self, sw2: Subwork2) {
-        self.data.write(0, sw2.version.to_be_bytes());
-        self.data.write(4, sw2.vermask.to_be_bytes());
-        debug_assert_eq!(sw2.prevhash.len(), 32);
-        self.data.write(8, &sw2.prevhash);
-        debug_assert_eq!(sw2.merkle_root.len(), 32);
-        self.data.write(40, &sw2.merkle_root);
-        debug_assert_eq!(sw2.ntime.len(), 4);
-        self.data.write(72, &sw2.ntime);
-        debug_assert_eq!(sw2.nbits.len(), 4);
-        self.data.write(76, &sw2.nbits);
+        unsafe {
+            self.data.write_u32(0, sw2.version.to_be());
+            self.data.write_u32(4, sw2.vermask.to_be());
+            debug_assert_eq!(sw2.prevhash.len(), 32);
+            self.data.write_as_u32(8, &sw2.prevhash);
+            debug_assert_eq!(sw2.merkle_root.len(), 32);
+            self.data.write_as_u32(40, &sw2.merkle_root);
+            debug_assert_eq!(sw2.ntime.len(), 4);
+            self.data.write_as_u32(72, &sw2.ntime);
+            debug_assert_eq!(sw2.nbits.len(), 4);
+            self.data.write_as_u32(76, &sw2.nbits);
+        }
 
         self.subworks.push_front(sw2);
         self.subworks.truncate(2);
