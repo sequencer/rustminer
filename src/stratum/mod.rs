@@ -1,3 +1,4 @@
+use std::net::TcpStream as StdTcpStream;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -10,13 +11,12 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
 
-use super::util::Notify;
-use super::util::SinkHook;
+use super::util::{Notify, SinkHook};
 use super::work::*;
 
 pub use self::message::*;
 
-pub mod checker;
+mod checker;
 mod message;
 mod reader;
 
@@ -47,7 +47,6 @@ impl Stream for WorkStream {
 
 pub struct Pool {
     addr: String,
-    tcpstream: Option<std::net::TcpStream>,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
@@ -62,7 +61,6 @@ impl Pool {
     pub fn new(addr: &str) -> Self {
         Self {
             addr: String::from(addr),
-            tcpstream: None,
             reader: None,
             writer: None,
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
@@ -81,12 +79,14 @@ impl Pool {
         let (writer_tx, writer_rx) = channel::<String>(16);
         self.writer = Some(writer_tx);
 
-        self.tcpstream = Some(std::net::TcpStream::connect(&self.addr).unwrap());
         let tcpstream = TcpStream::from_std(
-            self.tcpstream.as_ref().unwrap().try_clone().unwrap(),
+            StdTcpStream::connect(&self.addr).expect("tcp connect err!"),
             &Handle::default(),
         )
         .unwrap();
+
+        tcpstream.set_nodelay(true).expect("set_nodelay err!");
+
         let (sink, stream) = LinesCodec::new().framed(tcpstream).split();
 
         let last_active = self.last_active.clone();
