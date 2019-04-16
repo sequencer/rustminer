@@ -31,7 +31,7 @@ fn main_loop() {
     let connect_pool = pool.connect();
     let checker = pool.checker();
 
-    let exts = vec![String::from("version-rolling")];
+    let exts = vec!["version-rolling"];
     let ext_params = json!({
         "version-rolling.mask": "1fffe000",
         "version-rolling.min-bit-count": 2
@@ -110,7 +110,7 @@ fn main_loop() {
                         let params = sw2.into_params("h723n8m.001", &nonce, version_bits);
                         let msg = Action {
                             id: Some(4),
-                            method: String::from("mining.submit"),
+                            method: "mining.submit",
                             params,
                         };
                         let data = to_json_string(&msg).unwrap();

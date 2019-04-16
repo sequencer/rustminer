@@ -8,15 +8,15 @@ use crate::util::hex_to;
 use super::*;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Action {
-    pub id: Option<u32>,
-    pub method: String,
+pub struct Action<'a> {
+    pub id: Option<u8>,
+    pub method: &'a str,
     pub params: Params,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Respond {
-    pub id: Option<u32>,
+    pub id: Option<u8>,
     pub result: ResultOf,
     pub error: JsonValue,
 }
@@ -34,7 +34,7 @@ pub enum Params {
     #[serde(skip_deserializing)]
     User([String; 2]),
     #[serde(skip_deserializing)]
-    Config(Vec<String>, JsonValue),
+    Config(Vec<&'static str>, JsonValue),
     #[serde(skip_deserializing)]
     Submit([String; 5]),
     #[serde(skip_deserializing)]

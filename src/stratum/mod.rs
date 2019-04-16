@@ -124,7 +124,7 @@ impl Pool {
     pub fn subscribe(&mut self) {
         let msg = Action {
             id: Some(1),
-            method: String::from("mining.subscribe"),
+            method: "mining.subscribe",
             params: Params::None([]),
         };
         let _ = self.send(&msg).wait();
@@ -133,16 +133,16 @@ impl Pool {
     pub fn authorize(&mut self, user: &str, pass: &str) {
         let msg = Action {
             id: Some(2),
-            method: String::from("mining.authorize"),
+            method: "mining.authorize",
             params: Params::User([String::from(user), String::from(pass)]),
         };
         let _ = self.send(&msg).wait();
     }
 
-    pub fn configure(&mut self, exts: Vec<String>, ext_params: serde_json::Value) {
+    pub fn configure(&mut self, exts: Vec<&'static str>, ext_params: serde_json::Value) {
         let msg = Action {
             id: Some(1),
-            method: String::from("mining.configure"),
+            method: "mining.configure",
             params: Params::Config(exts, ext_params),
         };
 

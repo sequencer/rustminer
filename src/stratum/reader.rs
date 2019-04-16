@@ -21,13 +21,13 @@ impl Pool {
                         }));
                     }
                     Params::Num([n]) => {
-                        if s.method.as_str() == "mining.set_difficulty" {
+                        if s.method == "mining.set_difficulty" {
                             info!("=> set difficulty: {}!", &n);
                             *diff.lock().unwrap() = n;
                         }
                     }
                     Params::TMask(mask) => {
-                        if s.method.as_str() == "mining.set_version_mask" {
+                        if s.method == "mining.set_version_mask" {
                             if mask.len() == 1 {
                                 let mask = mask[0];
                                 info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
