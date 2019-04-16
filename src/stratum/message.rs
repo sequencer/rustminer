@@ -1,5 +1,7 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use serde_json::map::Map as JsonMap;
+use serde_json::Value as JsonValue;
 
 use crate::util::hex_to;
 
@@ -16,63 +18,45 @@ pub struct Action {
 pub struct Respond {
     pub id: Option<u32>,
     pub result: ResultOf,
-    pub error: serde_json::Value,
+    pub error: JsonValue,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Params {
+    #[serde(skip_serializing)]
     Work(Work),
     Bool(bool),
     Num([f64; 1]),
-    TMask(TMask),
+    #[serde(skip_serializing, deserialize_with = "hex_to::u32_vec")]
+    TMask(Vec<u32>),
+    #[serde(skip_deserializing)]
     User([String; 2]),
-    Config(Config),
+    #[serde(skip_deserializing)]
+    Config(Vec<String>, JsonValue),
+    #[serde(skip_deserializing)]
     Submit([String; 5]),
-    Submit2([String; 6]),
-    None(Vec<()>),
+    #[serde(skip_deserializing)]
+    Submit2([String; 6]), // with version_bits
+    None([(); 0]),
 }
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TMask(#[serde(deserialize_with = "hex_to::u32_vec")] pub Vec<u32>);
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Config(pub Vec<String>, pub serde_json::Value);
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum ResultOf {
-    Configure(serde_json::map::Map<String, serde_json::Value>),
-    Authorize(BoolOrNull),
-    Subscribe(ResultOfSubscribe),
+    Configure(JsonMap<String, JsonValue>),
+    Authorize(Option<bool>),
+    Subscribe(
+        ResultOfSubscribe,                                  // set_difficulty & notify
+        #[serde(deserialize_with = "hex_to::bytes")] Bytes, // xnonce1
+        usize,                                              // xnonce2_size
+    ),
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-pub enum BoolOrNull {
-    Bool(bool),
-    Null,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct ResultOfSubscribe(
-    pub ResultOfSubscribe0, // set_difficulty & notify
-    #[serde(deserialize_with = "hex_to::bytes")] pub Bytes, // xnonce1
-    pub usize,              // xnonce2_size
-);
-
-#[derive(Deserialize, Debug)]
-#[serde(untagged)]
-pub enum ResultOfSubscribe0 {
+pub enum ResultOfSubscribe {
     A([String; 2]),
     B([[String; 2]; 2]),
 }
-
-pub trait ToJsonString: serde::Serialize {
-    fn to_string(&self) -> serde_json::Result<String> {
-        serde_json::to_string(&self)
-    }
-}
-
-impl<T: serde::Serialize> ToJsonString for T {}

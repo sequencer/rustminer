@@ -125,7 +125,7 @@ impl Pool {
         let msg = Action {
             id: Some(1),
             method: String::from("mining.subscribe"),
-            params: Params::None(vec![]),
+            params: Params::None([]),
         };
         let _ = self.send(&msg).wait();
     }
@@ -143,7 +143,7 @@ impl Pool {
         let msg = Action {
             id: Some(1),
             method: String::from("mining.configure"),
-            params: Params::Config(Config(exts, ext_params)),
+            params: Params::Config(exts, ext_params),
         };
 
         let _ = self.send(&msg).wait();

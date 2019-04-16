@@ -26,11 +26,15 @@ impl Pool {
                             *diff.lock().unwrap() = n;
                         }
                     }
-                    Params::TMask(tmask) => {
+                    Params::TMask(mask) => {
                         if s.method.as_str() == "mining.set_version_mask" {
-                            let mask = tmask.0[0];
-                            info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
-                            *vermask.lock().unwrap() = Some(mask);
+                            if mask.len() == 1 {
+                                let mask = mask[0];
+                                info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
+                                *vermask.lock().unwrap() = Some(mask);
+                            } else {
+                                warn!("=> unknown vermask: {:?}!", mask);
+                            }
                         }
                     }
                     _ => info!("=> {}: {:?}", s.method, s.params),
@@ -55,15 +59,19 @@ impl Pool {
                         }
 
                         match r {
-                            BoolOrNull::Bool(x) if x => info!("=> {} {}!", action, result[0]),
+                            Some(x) if x => info!("=> {} {}!", action, result[0]),
                             _ => info!("=> {} {}!", action, result[1]),
                         }
                     }
-                    ResultOf::Subscribe(r) => {
-                        info!("=> set xnonce1: 0x{}, xnonce2_size: {}!", r.1.to_hex(), r.2);
+                    ResultOf::Subscribe(_, xnonce1, xnonce2_size) => {
+                        info!(
+                            "=> set xnonce1: 0x{}, xnonce2_size: {}!",
+                            xnonce1.to_hex(),
+                            xnonce2_size
+                        );
                         let mut xnonce = xnonce.lock().unwrap();
-                        xnonce.0 = r.1;
-                        xnonce.1 = r.2;
+                        xnonce.0 = xnonce1;
+                        xnonce.1 = xnonce2_size;
                     }
                     ResultOf::Configure(r) => {
                         if let Some(result) = r.get("version-rolling") {

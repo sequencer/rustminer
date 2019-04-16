@@ -10,7 +10,7 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 
 use bytes::Bytes;
-use serde_json::json;
+use serde_json::{json, to_string as to_json_string};
 use tokio::prelude::*;
 //use tokio::runtime::current_thread;
 
@@ -113,7 +113,7 @@ fn main_loop() {
                             method: String::from("mining.submit"),
                             params,
                         };
-                        let data = msg.to_string().unwrap();
+                        let data = to_json_string(&msg).unwrap();
                         tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
                         info!(
                             "=> submit nonce: 0x{} (difficulty: {:0<18})",
