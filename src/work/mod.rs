@@ -54,6 +54,8 @@ impl Work {
         header.extend(&self.merkle_root(xnonce));
         header.extend(&self.ntime);
         header.extend(&self.nbits);
+        debug_assert_eq!(header.len(), 76);
+
         header
     }
 

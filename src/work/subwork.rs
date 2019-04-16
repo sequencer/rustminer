@@ -1,4 +1,4 @@
-use bytes::BytesMut;
+use bytes::{BufMut, BytesMut};
 use futures::stream::Stream;
 use futures::{Async, Poll};
 use num_traits::cast::ToPrimitive;
@@ -19,12 +19,15 @@ pub struct Subwork {
 }
 
 impl Subwork {
-    pub fn target(&self, nonce: &Bytes) -> Bytes {
-        let mut target = BytesMut::with_capacity(32);
+    pub fn target(&self, nonce: u32) -> Bytes {
+        let mut target = BytesMut::with_capacity(80);
         target.extend(&self.block_header);
-        target.extend(nonce);
+        debug_assert_eq!(target.len(), 76);
+        target.put_u32_be(nonce);
+
         target = target.flip32().sha256d();
         target.reverse();
+
         target.freeze()
     }
 
@@ -32,18 +35,18 @@ impl Subwork {
         2.695_994_666_715_064e67 / BigUint::from_bytes_be(target).to_f64().unwrap()
     }
 
-    pub fn diff(&self, nonce: &Bytes) -> f64 {
+    pub fn diff(&self, nonce: u32) -> f64 {
         let target = self.target(nonce);
         Self::target_diff(&target)
     }
 
-    pub fn into_params(self, name: &str, nonce: &Bytes) -> Params {
+    pub fn into_params(self, name: &str, nonce: u32) -> Params {
         Params::Submit([
             String::from(name),
             self.workid,
             self.xnonce2.to_hex(),
             self.block_header[68..72].to_hex(),
-            nonce.to_hex(),
+            nonce.to_be_bytes().to_hex(),
         ])
     }
 }

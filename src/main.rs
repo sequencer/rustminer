@@ -4,12 +4,10 @@
 #[macro_use]
 extern crate log;
 
-use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, sleep};
 use std::time::Duration;
 
-use bytes::Bytes;
 use serde_json::{json, to_string as to_json_string};
 use tokio::prelude::*;
 //use tokio::runtime::current_thread;
@@ -87,7 +85,7 @@ fn main_loop() {
     let mut offset = 0;
     let receive_nonce = nonce_receiver.for_each(move |received| {
         let fpga_writer = fpga_writer.clone();
-        let nonce = Bytes::from_iter(received[0..4].iter().rev().cloned());
+        let nonce = u32::from_le_bytes(unsafe { *(received[0..4].as_ptr() as *const [u8; 4]) });
         let version_count =
             u32::from_le_bytes(unsafe { *(received[8..12].as_ptr() as *const [u8; 4]) })
                 - u32::from((received[7] - received[5]) & 0x7f);
@@ -101,13 +99,13 @@ fn main_loop() {
         for sw2 in subworks {
             for i in (offset..16).chain(0..offset) {
                 let version_bits = fpga::version_bits(sw2.vermask, version_count - i);
-                let target = sw2.target(&nonce, version_bits);
+                let target = sw2.target(nonce, version_bits);
                 if target.starts_with(b"\0\0\0\0") {
                     offset = i;
                     let diff = Subwork2::target_diff(&target);
                     debug!("received: {}, difficulty: {:0<18}", received.to_hex(), diff);
                     if diff >= *pool_diff.lock().unwrap() {
-                        let params = sw2.into_params("h723n8m.001", &nonce, version_bits);
+                        let params = sw2.into_params("h723n8m.001", nonce, version_bits);
                         let msg = Action {
                             id: Some(4),
                             method: "mining.submit",
@@ -116,9 +114,8 @@ fn main_loop() {
                         let data = to_json_string(&msg).unwrap();
                         tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
                         info!(
-                            "=> submit nonce: 0x{} (difficulty: {:0<18})",
-                            nonce.to_hex(),
-                            diff
+                            "=> submit nonce: 0x{:08x} (difficulty: {:0<18})",
+                            nonce, diff
                         );
                     };
                     return Ok(());

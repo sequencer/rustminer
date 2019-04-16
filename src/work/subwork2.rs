@@ -1,4 +1,4 @@
-use bytes::BytesMut;
+use bytes::{BufMut, BytesMut};
 use futures::stream::Stream;
 use futures::{Async, Poll};
 use num_traits::cast::ToPrimitive;
@@ -21,24 +21,27 @@ pub struct Subwork2 {
 }
 
 impl Subwork2 {
-    pub fn block_header(&self, version_bits: u32) -> Bytes {
-        let mut header = Bytes::with_capacity(76);
+    pub fn block_header(&self, version_bits: u32) -> BytesMut {
+        let mut header = BytesMut::with_capacity(80);
 
         let version = (self.version & !self.vermask) | version_bits;
-        header.extend(&version.to_be_bytes());
+        header.put_u32_be(version);
         header.extend(&self.prevhash);
         header.extend(&self.merkle_root);
         header.extend(&self.ntime);
         header.extend(&self.nbits);
+        debug_assert_eq!(header.len(), 76);
+
         header
     }
 
-    pub fn target(&self, nonce: &Bytes, version_bits: u32) -> Bytes {
-        let mut target = BytesMut::with_capacity(32);
-        target.extend(&self.block_header(version_bits));
-        target.extend(nonce);
+    pub fn target(&self, nonce: u32, version_bits: u32) -> Bytes {
+        let mut target = self.block_header(version_bits);
+        target.put_u32_be(nonce);
+
         target = target.flip32().sha256d();
         target.reverse();
+
         target.freeze()
     }
 
@@ -46,13 +49,13 @@ impl Subwork2 {
         2.695_994_666_715_064e67 / BigUint::from_bytes_be(target).to_f64().unwrap()
     }
 
-    pub fn into_params(self, name: &str, nonce: &Bytes, version_bits: u32) -> Params {
+    pub fn into_params(self, name: &str, nonce: u32, version_bits: u32) -> Params {
         Params::Submit2([
             String::from(name),
             self.workid,
             self.xnonce2.to_hex(),
             self.ntime.to_hex(),
-            nonce.to_hex(),
+            nonce.to_be_bytes().to_hex(),
             version_bits.to_be_bytes().to_hex(),
         ])
     }

@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::iter::FromIterator;
 use std::path::Path;
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -54,8 +53,8 @@ impl Default for Codec {
 }
 
 impl Decoder for Codec {
-    // (subwork, nonce, target)
-    type Item = (Subwork, Bytes, Bytes);
+    // (subwork, target, nonce)
+    type Item = (Subwork, Bytes, u32);
     type Error = io::Error;
 
     fn decode(
@@ -77,14 +76,16 @@ impl Decoder for Codec {
                     if crc5_usb_check(&src[n..n + 7]) {
                         let received = src.split_to(n + 7).split_off(n);
                         let id = received[5];
-                        let nonce = Bytes::from_iter(received[1..5].iter().rev());
+                        let nonce = u32::from_le_bytes(unsafe {
+                            *(received[1..5].as_ptr() as *const [u8; 4])
+                        });;
 
                         // check subwork
                         let mut subwork = None;
                         let mut target = Bytes::default();
                         for i in 0..4 {
                             if let Some(ref sw) = &self.subworks[id.wrapping_sub(i) as usize] {
-                                target = sw.target(&nonce);
+                                target = sw.target(nonce);
                                 if target.starts_with(b"\0\0\0\0") {
                                     debug!(
                                         "received: 0x{}, id: {}, target: 0x{}",
