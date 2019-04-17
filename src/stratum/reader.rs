@@ -1,7 +1,8 @@
+use std::sync::atomic::Ordering;
+
 use crate::util::{hex_to, ToHex};
 
 use super::*;
-use std::sync::atomic::Ordering;
 
 impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
@@ -12,6 +13,8 @@ impl Pool {
         let work_notify = self.work_notify.clone();
         let vermask = self.vermask.clone();
         let diff = self.diff.clone();
+
+        #[allow(clippy::cognitive_complexity)]
         self.receiver().for_each(move |line| {
             if let Ok(s) = serde_json::from_str::<Action>(&line) {
                 match s.params {

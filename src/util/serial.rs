@@ -78,7 +78,7 @@ impl Decoder for Codec {
                         let id = received[5];
                         let nonce = u32::from_le_bytes(unsafe {
                             *(received[1..5].as_ptr() as *const [u8; 4])
-                        });;
+                        });
 
                         // check subwork
                         let mut subwork = None;

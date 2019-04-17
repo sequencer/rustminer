@@ -16,11 +16,7 @@ use tokio::prelude::*;
 use tokio::runtime::current_thread;
 
 use self::stratum::*;
-use self::util::{
-    fpga,
-    i2c::{self, BoardConfig},
-    Notify, ToHex,
-};
+use self::util::*;
 use self::work::*;
 
 pub mod stratum;

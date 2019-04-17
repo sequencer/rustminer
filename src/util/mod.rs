@@ -8,13 +8,14 @@ use sha256::Sha256;
 
 pub use self::{
     hex::{FromHex, ToHex},
+    i2c::BoardConfig,
     mmap::Mmap,
     notify::Notify,
     sinkhook::SinkHook,
 };
 
 pub mod fpga;
-pub mod hex;
+mod hex;
 pub mod i2c;
 mod mmap;
 mod notify;
