@@ -1,4 +1,5 @@
 #![feature(const_int_conversion)]
+#![feature(bind_by_move_pattern_guards)]
 
 #[macro_use]
 extern crate log;

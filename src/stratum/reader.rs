@@ -4,7 +4,9 @@ use super::*;
 
 impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
+        let authorized = self.authorized.clone();
         let xnonce = self.xnonce.clone();
+        let submitted_nonce = self.submitted_nonce.clone();
         let work_sender = self.work_channel.0.clone();
         let work_notify = self.work_notify.clone();
         let vermask = self.vermask.clone();
@@ -42,25 +44,41 @@ impl Pool {
             } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
                 match s.result {
                     ResultOf::Authorize(r) => {
-                        let (action, result);
-                        match s.id {
-                            Some(2) => {
-                                action = "authorized";
-                                result = ["successfully", "failed"];
-                            }
-                            Some(4) => {
-                                action = "submitted nonce";
-                                result = ["accepted", "rejected"];
-                            }
-                            _ => {
-                                action = "unknown";
-                                result = ["true", "false"];
-                            }
-                        }
+                        let result = r.unwrap_or(false);
 
-                        match r {
-                            Some(x) if x => info!("=> {} {}!", action, result[0]),
-                            _ => info!("=> {} {}!", action, result[1]),
+                        match s.id {
+                            Some(2)
+                                if {
+                                    let mut authorized = authorized.lock().unwrap();
+                                    if !authorized.1 {
+                                        if result {
+                                            authorized.1 = true;
+                                            info!("=> authorized successfully!");
+                                        } else {
+                                            info!("=> authorized failed!");
+                                        }
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } => {}
+                            Some(id)
+                                if {
+                                    if let Some(nonce) = submitted_nonce.lock().unwrap()
+                                        [(id & 0b111) as usize]
+                                        .take()
+                                    {
+                                        if result {
+                                            info!("=> submitted nonce 0x{:08x} accepted!", nonce);
+                                        } else {
+                                            info!("=> submitted nonce 0x{:08x} rejected!", nonce);
+                                        }
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } => {}
+                            _ => warn!("unknown respond: {}!", line),
                         }
                     }
                     ResultOf::Subscribe(_, xnonce1, xnonce2_size) => {

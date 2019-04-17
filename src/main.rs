@@ -1,4 +1,5 @@
 #![feature(const_int_conversion)]
+#![feature(bind_by_move_pattern_guards)]
 #![allow(clippy::unreadable_literal)]
 
 #[macro_use]
@@ -46,6 +47,7 @@ fn main_loop() {
 
     let ws = WorkStream(pool.work_channel.1);
     let xnonce = pool.xnonce.clone();
+    let submitted_nonce = pool.submitted_nonce.clone();
     let vermask = pool.vermask.clone();
     let work_notify = pool.work_notify.clone();
 
@@ -91,6 +93,7 @@ fn main_loop() {
     });
 
     let mut offset = 0;
+    let mut nonce_id = 0;
     let receive_nonce = nonce_receiver.for_each(move |received| {
         let fpga_writer = fpga_writer.clone();
         let nonce = u32::from_le_bytes(unsafe { *(received[0..4].as_ptr() as *const [u8; 4]) });
@@ -121,16 +124,25 @@ fn main_loop() {
                     if diff >= *pool_diff.lock().unwrap() {
                         let params = sw2.into_params("h723n8m.001", nonce, version_bits);
                         let msg = Action {
-                            id: Some(4),
+                            id: Some(nonce_id),
                             method: "mining.submit",
                             params,
                         };
+
                         let data = to_json_string(&msg).unwrap();
                         tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
                         info!(
                             "=> submit nonce: 0x{:08x} (difficulty: {:0<18})",
                             nonce, diff
                         );
+
+                        let submitted_nonce =
+                            &mut submitted_nonce.lock().unwrap()[(nonce_id & 0b111) as usize];
+                        if let Some(nonce_old) = submitted_nonce {
+                            warn!("submitted nonce 0x{:08x} lost!", nonce_old);
+                        }
+                        *submitted_nonce = Some(nonce);
+                        nonce_id += 1;
                     };
                     return Ok(());
                 }
