@@ -5,6 +5,7 @@
 #[macro_use]
 extern crate log;
 
+use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -170,6 +171,11 @@ fn main_loop() {
             exit2_receiver
         });
     let _ = runtime.block_on(task);
+
+    // exit if authorized failed
+    if !*pool.authorized.1.lock().unwrap() {
+        exit(-1);
+    }
 }
 
 fn main() {
