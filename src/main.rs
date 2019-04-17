@@ -105,7 +105,13 @@ fn main_loop() {
         }
 
         for sw2 in subworks {
-            for i in (offset..16).chain(0..offset) {
+            for i in (1..=16).map(|x| {
+                (if x & 1 == 0 {
+                    offset + (x >> 1)
+                } else {
+                    offset - (x >> 1)
+                }) & 0xf
+            }) {
                 let version_bits = fpga::version_bits(sw2.vermask, version_count - i);
                 let target = sw2.target(nonce, version_bits);
                 if target.starts_with(b"\0\0\0\0") {
