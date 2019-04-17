@@ -10,13 +10,13 @@ use std::time::Duration;
 
 use serde_json::{json, to_string as to_json_string};
 use tokio::prelude::*;
-//use tokio::runtime::current_thread;
+use tokio::runtime::current_thread;
 
 use self::stratum::*;
 use self::util::{
     fpga,
     i2c::{self, BoardConfig},
-    ToHex,
+    Notify, ToHex,
 };
 use self::work::*;
 
@@ -77,10 +77,18 @@ fn main_loop() {
 
     let (nonce_reader, nonce_receiver) = fpga::reader().read_nonce();
 
-    //thread::spawn(|| {
-    //    let mut runtime = current_thread::Runtime::new().unwrap();
-    //    let _ = runtime.block_on(nonce_reader);
-    //});
+    let exit1 = Notify::default();
+    let exit1_receiver = exit1.clone();
+    let exit2 = Notify::default();
+    let exit2_receiver = exit2.clone();
+
+    thread::spawn(move || {
+        let mut runtime = current_thread::Runtime::new().unwrap();
+        let _ = runtime.block_on(nonce_reader.select2(exit1_receiver).then(|_| {
+            exit2.notify();
+            Result::<_, ()>::Ok(())
+        }));
+    });
 
     let mut offset = 0;
     let receive_nonce = nonce_receiver.for_each(move |received| {
@@ -132,16 +140,17 @@ fn main_loop() {
         Ok(())
     });
 
-    //let mut runtime = current_thread::Runtime::new().unwrap();
+    let mut runtime = current_thread::Runtime::new().unwrap();
     let task = connect_pool
         .select2(send_to_fpga)
         .select2(receive_nonce)
-        .select2(nonce_reader)
+        .select2(exit2_receiver.clone())
         .select2(checker)
-        .map(drop)
-        .map_err(drop);
-    //let _ = runtime.block_on(task);
-    tokio::run(task);
+        .then(move |_| {
+            exit1.notify();
+            exit2_receiver
+        });
+    let _ = runtime.block_on(task);
 }
 
 fn main() {
