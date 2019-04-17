@@ -1,6 +1,7 @@
 use crate::util::{hex_to, ToHex};
 
 use super::*;
+use std::sync::atomic::Ordering;
 
 impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
@@ -49,10 +50,9 @@ impl Pool {
                         match s.id {
                             Some(2)
                                 if {
-                                    let mut authorized = authorized.lock().unwrap();
-                                    if !*authorized {
+                                    if !authorized.load(Ordering::SeqCst) {
                                         if result {
-                                            *authorized = true;
+                                            authorized.store(true, Ordering::SeqCst);
                                             info!("=> authorized successfully!");
                                         } else {
                                             info!("=> authorized failed!");

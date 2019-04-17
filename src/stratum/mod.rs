@@ -1,4 +1,5 @@
 use std::net::TcpStream as StdTcpStream;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -49,7 +50,7 @@ pub struct Pool {
     addr: String,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
-    pub authorized: (Option<String>, Arc<Mutex<bool>>),
+    pub authorized: (Option<String>, Arc<AtomicBool>),
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub submitted_nonce: Arc<Mutex<[Option<u32>; 8]>>,
     pub work_channel: (Sender<Work>, Receiver<Work>),
@@ -65,7 +66,7 @@ impl Pool {
             addr: String::from(addr),
             reader: None,
             writer: None,
-            authorized: (None, Arc::new(Mutex::new(false))),
+            authorized: (None, Arc::new(AtomicBool::new(false))),
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             submitted_nonce: Arc::new(Mutex::new([None; 8])),
             work_channel: channel(4),

@@ -6,6 +6,7 @@
 extern crate log;
 
 use std::process::exit;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -173,7 +174,7 @@ fn main_loop() {
     let _ = runtime.block_on(task);
 
     // exit if authorized failed
-    if !*pool.authorized.1.lock().unwrap() {
+    if !pool.authorized.1.load(Ordering::SeqCst) {
         exit(-1);
     }
 }
