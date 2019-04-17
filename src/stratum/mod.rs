@@ -49,7 +49,7 @@ pub struct Pool {
     addr: String,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
-    pub authorized: Arc<Mutex<(Option<String>, bool)>>,
+    pub authorized: (Option<String>, Arc<Mutex<bool>>),
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub submitted_nonce: Arc<Mutex<[Option<u32>; 8]>>,
     pub work_channel: (Sender<Work>, Receiver<Work>),
@@ -65,7 +65,7 @@ impl Pool {
             addr: String::from(addr),
             reader: None,
             writer: None,
-            authorized: Arc::new(Mutex::new((None, false))),
+            authorized: (None, Arc::new(Mutex::new(false))),
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             submitted_nonce: Arc::new(Mutex::new([None; 8])),
             work_channel: channel(4),
@@ -135,7 +135,7 @@ impl Pool {
     }
 
     pub fn authorize(&mut self, user: &str, pass: &str) {
-        self.authorized.lock().unwrap().0 = Some(user.to_string());
+        self.authorized.0 = Some(user.to_string());
         let msg = Action {
             id: Some(2),
             method: "mining.authorize",

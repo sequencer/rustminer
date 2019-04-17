@@ -94,6 +94,7 @@ fn main_loop() {
 
     let mut offset = 0;
     let mut nonce_id = 0;
+    let user = pool.authorized.0.expect("not authorized!");
     let receive_nonce = nonce_receiver.for_each(move |received| {
         let fpga_writer = fpga_writer.clone();
         let nonce = u32::from_le_bytes(unsafe { *(received[0..4].as_ptr() as *const [u8; 4]) });
@@ -122,7 +123,7 @@ fn main_loop() {
                     let diff = Subwork2::target_diff(&target);
                     debug!("received: {}, difficulty: {:0<18}", received.to_hex(), diff);
                     if diff >= *pool_diff.lock().unwrap() {
-                        let params = sw2.into_params("h723n8m.001", nonce, version_bits);
+                        let params = sw2.into_params(&user, nonce, version_bits);
                         let msg = Action {
                             id: Some(nonce_id),
                             method: "mining.submit",

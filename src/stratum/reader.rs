@@ -4,7 +4,7 @@ use super::*;
 
 impl Pool {
     pub(super) fn reader(&mut self) -> impl Future<Item = (), Error = ()> + Send {
-        let authorized = self.authorized.clone();
+        let authorized = self.authorized.1.clone();
         let xnonce = self.xnonce.clone();
         let submitted_nonce = self.submitted_nonce.clone();
         let work_sender = self.work_channel.0.clone();
@@ -50,12 +50,13 @@ impl Pool {
                             Some(2)
                                 if {
                                     let mut authorized = authorized.lock().unwrap();
-                                    if !authorized.1 {
+                                    if !*authorized {
                                         if result {
-                                            authorized.1 = true;
+                                            *authorized = true;
                                             info!("=> authorized successfully!");
                                         } else {
                                             info!("=> authorized failed!");
+                                            return Err(());
                                         }
                                         true
                                     } else {
