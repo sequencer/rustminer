@@ -28,24 +28,20 @@ impl Pool {
                             Ok(())
                         }));
                     }
-                    Params::Num([n]) => {
-                        if s.method == "mining.set_difficulty" {
-                            info!("=> set difficulty: {}!", &n);
-                            *diff.lock().unwrap() = n;
+                    Params::Num([n]) if s.method == "mining.set_difficulty" => {
+                        info!("=> set difficulty: {}!", &n);
+                        *diff.lock().unwrap() = n;
+                    }
+                    Params::TMask(mask) if s.method == "mining.set_version_mask" => {
+                        if mask.len() == 1 {
+                            let mask = mask[0];
+                            info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
+                            *vermask.lock().unwrap() = Some(mask);
+                        } else {
+                            warn!("=> unknown vermask: {:?}!", mask);
                         }
                     }
-                    Params::TMask(mask) => {
-                        if s.method == "mining.set_version_mask" {
-                            if mask.len() == 1 {
-                                let mask = mask[0];
-                                info!("=> set vermask: 0x{}!", mask.to_be_bytes().to_hex());
-                                *vermask.lock().unwrap() = Some(mask);
-                            } else {
-                                warn!("=> unknown vermask: {:?}!", mask);
-                            }
-                        }
-                    }
-                    _ => info!("=> {}: {:?}", s.method, s.params),
+                    _ => warn!("=> unknown method: {}!", line),
                 }
             } else if let Ok(s) = serde_json::from_str::<Respond>(&line) {
                 match s.result {
