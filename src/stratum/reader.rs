@@ -1,5 +1,7 @@
 use std::sync::atomic::Ordering;
 
+use serde_json::Value as JsonValue;
+
 use crate::util::{hex_to, ToHex};
 
 use super::*;
@@ -49,39 +51,37 @@ impl Pool {
                 match s.result {
                     ResultOf::Authorize(r) => {
                         let result = r.unwrap_or(false);
+                        let mut nonce = 0;
 
                         match s.id {
-                            Some(2)
-                                if {
-                                    if !authorized.load(Ordering::SeqCst) {
-                                        if result {
-                                            authorized.store(true, Ordering::SeqCst);
-                                            info!("=> authorized successfully!");
-                                        } else {
-                                            info!("=> authorized failed!");
-                                            return Err(());
-                                        }
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                } => {}
+                            Some(2) if !authorized.load(Ordering::SeqCst) => {
+                                if result {
+                                    authorized.store(true, Ordering::SeqCst);
+                                    info!("=> authorized successfully!");
+                                } else {
+                                    info!("=> authorized failed!");
+                                    return Err(());
+                                }
+                            }
                             Some(id)
-                                if {
-                                    if let Some(nonce) = submitted_nonce.lock().unwrap()
-                                        [(id & 0b111) as usize]
-                                        .take()
-                                    {
-                                        if result {
-                                            info!("=> submitted nonce 0x{:08x} accepted!", nonce);
-                                        } else {
-                                            info!("=> submitted nonce 0x{:08x} rejected!", nonce);
-                                        }
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                } => {}
+                                if submitted_nonce.lock().unwrap()[(id & 7) as usize]
+                                    .take()
+                                    .map(|x| nonce = x)
+                                    .is_some() =>
+                            {
+                                if result {
+                                    info!("=> submitted nonce 0x{:08x} accepted!", nonce);
+                                } else if let Some(Some(reason)) =
+                                    s.error.get(1).map(JsonValue::as_str)
+                                {
+                                    info!(
+                                        "=> submitted nonce 0x{:08x} rejected: {}!",
+                                        nonce, reason
+                                    );
+                                } else {
+                                    info!("=> submitted nonce 0x{:08x} rejected!", nonce);
+                                }
+                            }
                             _ => warn!("unknown respond: {}!", line),
                         }
                     }
