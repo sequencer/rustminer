@@ -59,6 +59,7 @@ impl Mmap {
 
     #[allow(clippy::cast_ptr_alignment)]
     pub unsafe fn write_u32(&mut self, offset: usize, value: u32) {
+        debug_assert_eq!((self.ptr as usize + offset) & 0b11, 0);
         debug_assert!(offset + 4 <= self.size);
         (self.ptr.add(offset) as *mut u32).write_volatile(value)
     }
@@ -66,8 +67,9 @@ impl Mmap {
     pub unsafe fn write_as_u32<T: AsRef<[u8]>>(&mut self, mut offset: usize, data: T) {
         let data = data.as_ref();
         let len = data.len();
-        debug_assert!(len >= 4 && offset + len <= self.size);
+        debug_assert_eq!((self.ptr as usize + offset) & 0b11, 0);
         debug_assert_eq!(len & 0b11, 0);
+        debug_assert!(len >= 4 && offset + len <= self.size);
         for v in data.iter().step_by(4) {
             self.write_u32(
                 offset,
@@ -131,7 +133,7 @@ impl<'a> Iterator for ReadMmap<'a, u8> {
 
 impl<'a> ReadMmap<'a, u32> {
     pub unsafe fn new(mmap: &'a mut Mmap, offset: usize, size: usize) -> Self {
-        debug_assert_eq!(offset & 0b11, 0);
+        debug_assert_eq!((mmap.ptr as usize + offset) & 0b11, 0);
         debug_assert_eq!(size & 0b11, 0);
         Self {
             mmap,
