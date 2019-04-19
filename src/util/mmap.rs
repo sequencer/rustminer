@@ -1,4 +1,5 @@
 use std::fs::OpenOptions;
+use std::marker::PhantomData;
 use std::ops::{Index, IndexMut, Range};
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
@@ -12,23 +13,22 @@ pub struct Mmap {
     size: size_t,
 }
 
+pub struct ReadMmap<'a, T> {
+    mmap: &'a mut Mmap,
+    offset: usize,
+    size: usize,
+    counter: usize,
+    phantom: PhantomData<T>,
+}
+
 impl Mmap {
-    pub const unsafe fn uninitialized() -> Self {
+    pub const unsafe fn uninit() -> Self {
         Self {
             ptr: null_mut(),
             size: 0,
         }
     }
-}
 
-pub struct ReadMmap<'a> {
-    mmap: &'a mut Mmap,
-    offset: usize,
-    size: usize,
-    counter: usize,
-}
-
-impl Mmap {
     pub fn new<T: AsRef<Path>>(path: T, offset: off_t, size: size_t) -> Self {
         let f = OpenOptions::new()
             .read(true)
@@ -77,8 +77,12 @@ impl Mmap {
         }
     }
 
-    pub fn read(&mut self, offset: usize, size: usize) -> ReadMmap {
-        ReadMmap::new(self, offset, size)
+    pub fn read(&mut self, offset: usize, size: usize) -> ReadMmap<u8> {
+        ReadMmap::<u8>::new(self, offset, size)
+    }
+
+    pub unsafe fn read_u32(&mut self, offset: usize, size: usize) -> ReadMmap<u32> {
+        ReadMmap::<u32>::new(self, offset, size)
     }
 
     pub unsafe fn from_raw(ptr: *mut u8, size: usize) -> Self {
@@ -94,18 +98,19 @@ impl Mmap {
     }
 }
 
-impl<'a> ReadMmap<'a> {
+impl<'a> ReadMmap<'a, u8> {
     pub fn new(mmap: &'a mut Mmap, offset: usize, size: usize) -> Self {
         Self {
             mmap,
             offset,
             size,
             counter: 0,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<'a> Iterator for ReadMmap<'a> {
+impl<'a> Iterator for ReadMmap<'a, u8> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -119,6 +124,37 @@ impl<'a> Iterator for ReadMmap<'a> {
                     .read_volatile()
             };
             self.counter += 1;
+            Some(value)
+        }
+    }
+}
+
+impl<'a> ReadMmap<'a, u32> {
+    pub unsafe fn new(mmap: &'a mut Mmap, offset: usize, size: usize) -> Self {
+        debug_assert_eq!(offset & 0b11, 0);
+        debug_assert_eq!(size & 0b11, 0);
+        Self {
+            mmap,
+            offset,
+            size,
+            counter: 0,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a> Iterator for ReadMmap<'a, u32> {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.counter >= self.size {
+            None
+        } else {
+            let value = unsafe {
+                #[allow(clippy::cast_ptr_alignment)]
+                (self.mmap.ptr.add(self.offset + self.counter) as *mut u32).read_volatile()
+            };
+            self.counter += 4;
             Some(value)
         }
     }

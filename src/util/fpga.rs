@@ -3,7 +3,7 @@ use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use crc_all::CrcAlgo;
 use futures::sync::mpsc::{channel, Receiver};
 use futures::{Future, Sink, Stream};
@@ -14,7 +14,7 @@ use crate::work::Subwork2;
 
 use super::{Mmap, ToHex};
 
-static mut UIO_MMAP: Mmap = unsafe { Mmap::uninitialized() };
+static mut UIO_MMAP: Mmap = unsafe { Mmap::uninit() };
 
 pub fn mmap(offset: usize, size: usize) -> Mmap {
     static INIT: Once = Once::new();
@@ -217,12 +217,15 @@ impl Reader {
             .map(move |n| {
                 trace!("received interrupt: {}!", n);
 
-                let mut nonce = Bytes::with_capacity(12);
-                nonce.extend(self.data.read(0, 12));
+                let mut nonce = BytesMut::with_capacity(12);
+                //nonce.extend(self.data.read(0, 12));
+                for v in unsafe { self.data.read_u32(0, 12) } {
+                    nonce.put_u32_le(v);
+                }
                 self.csr_in.notify(3);
 
                 trace!("read from fpga: {}", nonce.to_hex());
-                nonce
+                nonce.freeze()
             })
             .map_err(|e| error!("read nonce from fpga err: {:?}", e))
             .forward(sender.sink_map_err(|e| error!("send nonce to channel err: {:?}", e)))
