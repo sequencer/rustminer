@@ -1,4 +1,3 @@
-#![feature(const_int_conversion)]
 #![feature(bind_by_move_pattern_guards)]
 #![allow(clippy::unreadable_literal)]
 
