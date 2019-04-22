@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use bytes::Bytes;
+use futures::future::{err, ok};
 use futures::stream::Stream;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async::*, Future, Poll};
@@ -78,38 +79,50 @@ impl Pool {
     }
 
     pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send {
+        let connect =
+            || TcpStream::from_std(StdTcpStream::connect(&self.addr)?, &Handle::default());
+
+        let tcpstream = match connect() {
+            Ok(tcpstream) => {
+                tcpstream
+                    .set_nodelay(true)
+                    .unwrap_or_else(|e| warn!("set_nodelay err: {:?}!", e));
+                ok(tcpstream)
+            }
+            Err(e) => {
+                error!("tcp connect err: {:?}!", e);
+                err(())
+            }
+        };
+
         let (reader_tx, reader_rx) = channel::<String>(16);
         self.reader = Some(reader_rx);
 
         let (writer_tx, writer_rx) = channel::<String>(16);
         self.writer = Some(writer_tx);
 
-        let tcpstream = TcpStream::from_std(
-            StdTcpStream::connect(&self.addr).expect("tcp connect err!"),
-            &Handle::default(),
-        )
-        .unwrap();
-
-        tcpstream.set_nodelay(true).expect("set_nodelay err!");
-
-        let (sink, stream) = LinesCodec::new().framed(tcpstream).split();
-
         let last_active = self.last_active.clone();
-        let reader = stream
-            .inspect(move |line| {
-                debug!("recv: {}", line);
-                *last_active.lock().unwrap() = Instant::now();
-            })
-            .map_err(|e| error!("recv from pool err: {:?}", e))
-            .forward(reader_tx.sink_map_err(|e| error!("send data to channel err: {:?}", e)));
-        let reader = reader.select2(self.reader());
+        let read_line = self.reader();
 
-        let writer = writer_rx.inspect(|line| debug!("send: {}", line)).forward(
-            SinkHook::new(sink, || debug!("data sent!"))
-                .sink_map_err(|e| error!("send to pool err: {:?}", e)),
-        );
+        tcpstream.and_then(move |tcpstream| {
+            let (sink, stream) = LinesCodec::new().framed(tcpstream).split();
 
-        reader.select2(writer).map(drop).map_err(drop)
+            let reader = stream
+                .inspect(move |line| {
+                    debug!("recv: {}", line);
+                    *last_active.lock().unwrap() = Instant::now();
+                })
+                .map_err(|e| error!("recv from pool err: {:?}", e))
+                .forward(reader_tx.sink_map_err(|e| error!("send data to channel err: {:?}", e)));
+            let reader = reader.select2(read_line);
+
+            let writer = writer_rx.inspect(|line| debug!("send: {}", line)).forward(
+                SinkHook::new(sink, || debug!("data sent!"))
+                    .sink_map_err(|e| error!("send to pool err: {:?}", e)),
+            );
+
+            reader.select2(writer).map(drop).map_err(drop)
+        })
     }
 
     pub fn sender(&mut self) -> Sender<String> {
