@@ -198,7 +198,6 @@ impl Writer {
     }
 
     pub fn enable_sender(&mut self, board: usize) {
-        self.io_select.set_all(false);
         self.io_select.set_csr(board, false);
         self.io_enable.set_csr(board, true);
     }
@@ -243,7 +242,6 @@ impl SerialSender {
     }
 
     pub fn enable_sender(&mut self, board: usize) {
-        self.io_select.set_all(false);
         self.io_select.set_csr(board, false);
         self.io_enable.set_csr(board, true);
     }
