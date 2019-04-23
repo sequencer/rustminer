@@ -216,11 +216,11 @@ impl Reader {
             .map(move |n| {
                 trace!("received interrupt: {}!", n);
 
-                let mut nonce = BytesMut::with_capacity(12);
-                //nonce.extend(self.data.read(0, 12));
+                let mut nonce = BytesMut::with_capacity(13);
                 for v in unsafe { self.data.read_u32(0, 12) } {
                     nonce.put_u32_le(v);
                 }
+                nonce.put_u8(unsafe { self.data.ptr().add(12).read_volatile() });
                 self.csr_in.notify(3);
 
                 trace!("read from fpga: {}", nonce.to_hex());
