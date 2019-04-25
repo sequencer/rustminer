@@ -1,5 +1,5 @@
 use std::net::TcpStream as StdTcpStream;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -51,6 +51,7 @@ pub struct Pool {
     addr: String,
     reader: Option<Receiver<String>>,
     writer: Option<Sender<String>>,
+    pub connected: Arc<AtomicBool>,
     pub authorized: (Option<String>, Arc<AtomicBool>),
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub submitted_nonce: Arc<Mutex<[Option<u32>; 8]>>,
@@ -67,6 +68,7 @@ impl Pool {
             addr: String::from(addr),
             reader: None,
             writer: None,
+            connected: Arc::new(AtomicBool::new(false)),
             authorized: (None, Arc::new(AtomicBool::new(false))),
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             submitted_nonce: Arc::new(Mutex::new([None; 8])),
@@ -101,10 +103,13 @@ impl Pool {
         let (writer_tx, writer_rx) = channel::<String>(16);
         self.writer = Some(writer_tx);
 
+        let connected = self.connected.clone();
+
         let last_active = self.last_active.clone();
         let read_line = self.reader();
 
         tcpstream.and_then(move |tcpstream| {
+            connected.store(true, Ordering::SeqCst);
             let (sink, stream) = LinesCodec::new().framed(tcpstream).split();
 
             let reader = stream

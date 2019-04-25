@@ -171,7 +171,7 @@ fn main_loop(boards: &[u16]) {
     let _ = runtime.block_on(task);
 
     // exit if authorized failed
-    if !pool.authorized.1.load(Ordering::SeqCst) {
+    if pool.connected.load(Ordering::SeqCst) && !pool.authorized.1.load(Ordering::SeqCst) {
         exit(-1);
     }
 }
