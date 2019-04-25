@@ -7,6 +7,7 @@ use fern::{Dispatch, InitError};
 use sha256::Sha256;
 
 pub use self::{
+    config::Config,
     hex::{FromHex, ToHex},
     i2c::BoardConfig,
     mmap::Mmap,
@@ -14,6 +15,7 @@ pub use self::{
     sinkhook::SinkHook,
 };
 
+mod config;
 pub mod fpga;
 mod hex;
 pub mod i2c;

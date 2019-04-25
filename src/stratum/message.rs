@@ -39,6 +39,7 @@ pub enum Params {
     Submit([String; 5]),
     #[serde(skip_deserializing)]
     Submit2([String; 6]), // with version_bits
+    String([String; 1]),
     None([(); 0]),
 }
 

@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate log;
 
+use std::fs::File;
 use std::process::exit;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -23,21 +24,28 @@ pub mod util;
 pub mod work;
 
 fn main_loop(boards: &[u16]) {
-    let mut pool = Pool::new("121.29.19.24:443");
+    let config = &mut String::new();
+    File::open("/etc/stratum/config.toml")
+        .expect("can't open config.toml!")
+        .read_to_string(config)
+        .expect("can't read config.toml!");
+    let config: Config = toml::from_str(&config).expect("can't parse config.toml!");
+
+    let pool0 = &config.pool[0];
+    let mut pool = Pool::new(&pool0.addr);
     let connect_pool = pool.connect();
     let checker = pool.checker();
 
     let exts = vec!["version-rolling"];
     let ext_params = json!({
-        "version-rolling.mask": "1fffe000",
-        "version-rolling.min-bit-count": 2
+        "version-rolling.mask": config.client.version_rolling.mask,
+        "version-rolling.min-bit-count": config.client.version_rolling.min_bit_count
     });
 
     // mining.configure
     pool.configure(exts, ext_params);
-
-    pool.subscribe();
-    pool.authorize("h723n8m.001", "");
+    pool.subscribe(config.client.user_agent);
+    pool.authorize(&pool0.user, &pool0.pass);
 
     let pool_sender = pool.sender();
     let pool_diff = pool.diff.clone();

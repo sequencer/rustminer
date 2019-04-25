@@ -1,0 +1,18 @@
+# file: /etc/stratum/config.toml
+
+[client]
+user-agent = "stratum/0.1.0"
+
+[client.version-rolling]
+mask = "1fffe000"
+min-bit-count = 2
+
+[[pool]]
+addr = "121.29.19.24:443"
+user = "h723n8m.001"
+pass = ""
+
+[[pool]]
+addr = "cn.ss.btc.com:443"
+user = "h723n8m.002"
+pass = ""

@@ -20,5 +20,6 @@ crc_all = "0.1.0"
 fern = "0.5.8"
 log = "0.4.6"
 chrono = "0.4.6"
+toml = "0.5.0"
 sha256 = { git = "https://github.com/nanpuyue/sha256", rev = "25b9f783" }
 tokio-uio = { git = "https://github.com/nanpuyue/tokio-uio" }

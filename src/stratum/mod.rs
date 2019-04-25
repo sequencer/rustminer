@@ -144,11 +144,16 @@ impl Pool {
             .and_then(|_| Ok(()))
     }
 
-    pub fn subscribe(&mut self) {
+    pub fn subscribe(&mut self, ua: Option<String>) {
+        let params = match ua {
+            Some(ua) => Params::String([ua; 1]),
+            None => Params::None([]),
+        };
+
         let msg = Action {
             id: Some(1),
             method: "mining.subscribe",
-            params: Params::None([]),
+            params,
         };
         let _ = self.send(&msg).wait();
     }
