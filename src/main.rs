@@ -22,7 +22,7 @@ pub mod stratum;
 pub mod util;
 pub mod work;
 
-fn main_loop() {
+fn main_loop(boards: &[u16]) {
     let mut pool = Pool::new("121.29.19.24:443");
     let connect_pool = pool.connect();
     let checker = pool.checker();
@@ -49,7 +49,9 @@ fn main_loop() {
     let work_notify = pool.work_notify.clone();
 
     let mut fpga_writer = fpga::writer();
-    fpga_writer.enable_sender(5);
+    for id in boards {
+        fpga_writer.enable_sender(*id as usize);
+    }
     let fpga_writer = Arc::new(Mutex::new(fpga_writer));
 
     let fpga_writer_clone = fpga_writer.clone();
@@ -177,16 +179,21 @@ fn main_loop() {
 fn main() {
     util::setup_logger().unwrap();
 
-    thread::spawn(|| {
+    let boards = &[5, 6];
+
+    thread::spawn(move || {
         let mut i2c = i2c::open("/dev/i2c-0");
-        let addr = 0x55;
         loop {
-            i2c.send_heart_beat(addr).expect("send heart beat err!");
+            for id in boards {
+                i2c.send_heart_beat(0x50 + id)
+                    .expect("send heart beat err!");
+                sleep(Duration::from_micros(100));
+            }
             sleep(Duration::from_secs(10));
         }
     });
 
     loop {
-        main_loop();
+        main_loop(boards);
     }
 }
