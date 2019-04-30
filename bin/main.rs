@@ -12,16 +12,9 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 
 use serde_json::{json, to_string as to_json_string};
+use stratum::{stratum::*, util::*, work::*};
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
-
-use self::stratum::*;
-use self::util::*;
-use self::work::*;
-
-pub mod stratum;
-pub mod util;
-pub mod work;
 
 fn main_loop(boards: &[u16]) {
     let config = &mut String::new();
@@ -185,7 +178,7 @@ fn main_loop(boards: &[u16]) {
 }
 
 fn main() {
-    util::setup_logger().unwrap();
+    setup_logger().unwrap();
 
     let boards = &[5, 6];
 

@@ -1,0 +1,16 @@
+[package]
+name = "bin"
+version = "0.1.0"
+authors = ["nanpuyue <nanpuyue@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serde_json = "1.0.39"
+tokio = "0.1.16"
+log = "0.4.6"
+toml = "0.5.0"
+stratum = { path = "../" }
+
+[[bin]]
+name = "stratum"
+path = "main.rs"
