@@ -11,18 +11,26 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, sleep};
 use std::time::Duration;
 
+use boardconfig::*;
 use serde_json::{json, to_string as to_json_string};
 use stratum::{stratum::*, util::*, work::*};
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
 
-fn main_loop(boards: &[u16]) {
+fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     let config = &mut String::new();
     File::open("/etc/stratum/config.toml")
         .expect("can't open config.toml!")
         .read_to_string(config)
         .expect("can't read config.toml!");
     let config: Config = toml::from_str(&config).expect("can't parse config.toml!");
+
+    // start init boards
+    boards.lock().unwrap().clear();
+    for id in &config.board.enabled {
+        let (voltage, param) = config.board.get_setting(*id);
+        init_board(*id, voltage, param, i2c.clone(), boards.clone()).expect("init board err!");
+    }
 
     let pool0 = &config.pool[0];
     let mut pool = Pool::new(&pool0.addr);
@@ -49,11 +57,7 @@ fn main_loop(boards: &[u16]) {
     let vermask = pool.vermask.clone();
     let work_notify = pool.work_notify.clone();
 
-    let mut fpga_writer = fpga::writer();
-    for id in boards {
-        fpga_writer.enable_sender(*id as usize);
-    }
-    let fpga_writer = Arc::new(Mutex::new(fpga_writer));
+    let fpga_writer = Arc::new(Mutex::new(fpga::writer()));
 
     let fpga_writer_clone = fpga_writer.clone();
     let send_to_fpga = ws.for_each(move |w| {
@@ -180,13 +184,21 @@ fn main_loop(boards: &[u16]) {
 fn main() {
     setup_logger().unwrap();
 
-    let boards = &[5, 6];
+    let boards = Arc::new(Mutex::new(Vec::new()));
+    let i2c = Arc::new(Mutex::new(i2c::open("/dev/i2c-0")));
 
+    let boards_clone = boards.clone();
+    let i2c_clone = i2c.clone();
     thread::spawn(move || {
-        let mut i2c = i2c::open("/dev/i2c-0");
+        let i2c_lock = || {
+            let i2c_lock = i2c_clone.lock().unwrap();
+            sleep(Duration::from_micros(100));
+            i2c_lock
+        };
         loop {
-            for id in boards {
-                i2c.send_heart_beat(0x50 + id)
+            for id in &*boards_clone.lock().unwrap() {
+                i2c_lock()
+                    .send_heart_beat(0x50 + id)
                     .expect("send heart beat err!");
                 sleep(Duration::from_micros(100));
             }
@@ -195,6 +207,6 @@ fn main() {
     });
 
     loop {
-        main_loop(boards);
+        main_loop(boards.clone(), i2c.clone());
     }
 }
