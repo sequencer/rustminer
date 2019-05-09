@@ -1,9 +1,13 @@
+use std::cmp::min;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
 use bytes::{BufMut, BytesMut};
 use futures::stream::Stream;
 use futures::{Async, Poll};
 use num_traits::cast::ToPrimitive;
 
-use crate::stratum::Params;
+use crate::stratum::*;
 use crate::util::ToHex;
 
 use super::*;
@@ -18,6 +22,89 @@ pub struct Subwork2 {
     pub xnonce2: Bytes,
     pub version: u32,
     pub vermask: u32,
+}
+
+pub struct PoolData {
+    pub duration: Duration,
+    pub works: WorkStream,
+    pub xnonce: Arc<Mutex<(Bytes, usize)>>,
+    pub vermask: Arc<Mutex<Option<u32>>>,
+    pub notify: Notify,
+    pub maker: Option<Subwork2Maker>,
+}
+
+pub struct Subwork2Stream {
+    pub pools: Vec<PoolData>,
+    pub current_pool: usize,
+    pub switch_timeout: Instant,
+}
+
+impl Default for Subwork2Stream {
+    fn default() -> Self {
+        Self {
+            pools: Vec::new(),
+            current_pool: 0,
+            switch_timeout: Instant::now(),
+        }
+    }
+}
+
+impl Subwork2Stream {
+    fn current_pool(&mut self) -> usize {
+        if self.pools.len() == 2 {
+            let now = Instant::now();
+            if now > self.switch_timeout {
+                self.current_pool ^= 1;
+                self.switch_timeout = now + self.pools[self.current_pool].duration;
+            }
+            debug!("switch to pool {}", self.current_pool);
+            self.current_pool
+        } else {
+            0
+        }
+    }
+}
+
+impl Stream for Subwork2Stream {
+    type Item = (Subwork2, Notify, Duration);
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        let cur = self.current_pool();
+
+        match self.pools[cur].works.poll() {
+            Ok(Async::Ready(Some(work))) => {
+                self.pools[cur].notify.notified();
+                let subwork2maker = Subwork2Maker::new(
+                    work,
+                    &self.pools[cur].xnonce.lock().unwrap(),
+                    self.pools[cur].vermask.lock().unwrap().unwrap(),
+                );
+                self.pools[cur].maker = Some(subwork2maker);
+            }
+            Err(_) => return Err(()),
+            _ => {}
+        }
+
+        let subwork2 = match self.pools[cur].maker {
+            Some(ref mut maker) => maker.next(),
+            None => return Ok(Async::NotReady),
+        };
+
+        match subwork2 {
+            Some(subwork2) => {
+                let notify = self.pools[cur].notify.clone();
+                let now = Instant::now();
+                let timeout = if self.switch_timeout > now {
+                    min(Duration::from_secs(10), self.switch_timeout - now)
+                } else {
+                    Duration::from_secs(10)
+                };
+                Ok(Async::Ready(Some((subwork2, notify, timeout))))
+            }
+            None => Ok(Async::NotReady),
+        }
+    }
 }
 
 impl Subwork2 {
@@ -67,27 +154,20 @@ pub struct Subwork2Maker {
     xnonce2_size: usize,
     vermask: u32,
     counter: BigUint,
-    work_notify: Notify,
 }
 
 impl Subwork2Maker {
-    pub fn new(work: Work, xnonce: &(Bytes, usize), vermask: u32, work_notify: Notify) -> Self {
-        work_notify.notified();
+    pub fn new(work: Work, xnonce: &(Bytes, usize), vermask: u32) -> Self {
         Self {
             work,
             xnonce1: Bytes::from(xnonce.0.as_ref()),
             xnonce2_size: xnonce.1,
             vermask,
             counter: BigUint::from(0u32),
-            work_notify,
         }
     }
 
     fn next(&mut self) -> Option<Subwork2> {
-        if self.work_notify.notified() {
-            return None;
-        }
-
         if self.xnonce2_size * 8 < self.counter.bits() {
             return None;
         }
@@ -102,14 +182,5 @@ impl Subwork2Maker {
         self.counter += 1u8;
 
         Some(self.work.subwork2((&self.xnonce1, xnonce2), self.vermask))
-    }
-}
-
-impl Stream for Subwork2Maker {
-    type Item = Subwork2;
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        Ok(Async::Ready(self.next()))
     }
 }
