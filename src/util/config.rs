@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::Read;
+
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone, Debug)]
@@ -77,4 +80,13 @@ impl Board {
         }
         setting
     }
+}
+
+pub fn get_config() -> Config {
+    let config = &mut String::new();
+    File::open("/etc/stratum/config.toml")
+        .expect("can't open config.toml!")
+        .read_to_string(config)
+        .expect("can't read config.toml!");
+    toml::from_str(&config).expect("can't parse config.toml!")
 }

@@ -4,7 +4,6 @@
 #[macro_use]
 extern crate log;
 
-use std::fs::File;
 use std::process::exit;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -19,12 +18,7 @@ use tokio::prelude::*;
 use tokio::runtime::current_thread;
 
 fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
-    let config = &mut String::new();
-    File::open("/etc/stratum/config.toml")
-        .expect("can't open config.toml!")
-        .read_to_string(config)
-        .expect("can't read config.toml!");
-    let config: Config = toml::from_str(&config).expect("can't parse config.toml!");
+    let config = get_config();
 
     // start init boards
     boards.lock().unwrap().clear();

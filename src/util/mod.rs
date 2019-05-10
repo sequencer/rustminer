@@ -7,7 +7,7 @@ use fern::{Dispatch, InitError};
 use sha256::Sha256;
 
 pub use self::{
-    config::{Client, Config},
+    config::{get_config, Client, Config},
     hex::{FromHex, ToHex},
     i2c::BoardConfig,
     mmap::Mmap,
