@@ -35,30 +35,30 @@ pub struct PoolData {
 
 pub struct Subwork2Stream {
     pub pools: Vec<PoolData>,
-    pub current_pool: usize,
-    pub switch_timeout: Instant,
+    pub current: usize,
+    pub timeout: Instant,
 }
 
 impl Default for Subwork2Stream {
     fn default() -> Self {
         Self {
             pools: Vec::new(),
-            current_pool: 0,
-            switch_timeout: Instant::now(),
+            current: 0,
+            timeout: Instant::now(),
         }
     }
 }
 
 impl Subwork2Stream {
-    fn current_pool(&mut self) -> usize {
+    fn current(&mut self) -> usize {
         if self.pools.len() == 2 {
             let now = Instant::now();
-            if now > self.switch_timeout {
-                self.current_pool ^= 1;
-                self.switch_timeout = now + self.pools[self.current_pool].duration;
+            if now > self.timeout {
+                self.current ^= 1;
+                self.timeout = now + self.pools[self.current].duration;
+                debug!("switch to pool {}", self.current);
             }
-            debug!("switch to pool {}", self.current_pool);
-            self.current_pool
+            self.current
         } else {
             0
         }
@@ -70,20 +70,16 @@ impl Stream for Subwork2Stream {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let cur = self.current_pool();
+        let cur = self.current();
 
-        match self.pools[cur].works.poll() {
-            Ok(Async::Ready(Some(work))) => {
-                self.pools[cur].notify.notified();
-                let subwork2maker = Subwork2Maker::new(
-                    work,
-                    &self.pools[cur].xnonce.lock().unwrap(),
-                    self.pools[cur].vermask.lock().unwrap().unwrap(),
-                );
-                self.pools[cur].maker = Some(subwork2maker);
-            }
-            Err(_) => return Err(()),
-            _ => {}
+        if let Ok(Async::Ready(Some(work))) = self.pools[cur].works.poll() {
+            self.pools[cur].notify.notified();
+            let subwork2maker = Subwork2Maker::new(
+                work,
+                &self.pools[cur].xnonce.lock().unwrap(),
+                self.pools[cur].vermask.lock().unwrap().unwrap(),
+            );
+            self.pools[cur].maker = Some(subwork2maker);
         }
 
         let subwork2 = match self.pools[cur].maker {
@@ -95,8 +91,8 @@ impl Stream for Subwork2Stream {
             Some(subwork2) => {
                 let notify = self.pools[cur].notify.clone();
                 let now = Instant::now();
-                let timeout = if self.switch_timeout > now {
-                    min(Duration::from_secs(10), self.switch_timeout - now)
+                let timeout = if self.timeout > now {
+                    min(Duration::from_secs(10), self.timeout - now)
                 } else {
                     Duration::from_secs(10)
                 };
