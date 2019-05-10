@@ -18,6 +18,7 @@ use super::util::{Client, Notify, SinkHook};
 use super::work::*;
 
 pub use self::message::*;
+use crate::util::Config;
 
 mod checker;
 mod message;
@@ -82,7 +83,11 @@ impl Pool {
         }
     }
 
-    pub fn connect(&mut self) -> impl Future<Item = (), Error = ()> + Send {
+    pub fn connect(
+        &mut self,
+        config: &Config,
+        pool: usize,
+    ) -> impl Future<Item = (), Error = ()> + Send {
         let connect =
             || TcpStream::from_std(StdTcpStream::connect(&self.addr)?, &Handle::default());
 
@@ -104,6 +109,10 @@ impl Pool {
 
         let (writer_tx, writer_rx) = channel::<String>(16);
         self.writer = Some(writer_tx);
+
+        self.configure(&config.client);
+        self.subscribe(&config.client.user_agent);
+        self.authorize(&config.pool[pool].user, &config.pool[pool].pass);
 
         let connected = self.connected.clone();
 
@@ -127,7 +136,6 @@ impl Pool {
                 SinkHook::new(sink, || debug!("data sent!"))
                     .sink_map_err(|e| error!("send to pool err: {:?}", e)),
             );
-
             reader.select2(writer).map(drop).map_err(drop)
         })
     }

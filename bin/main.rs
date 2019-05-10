@@ -28,13 +28,7 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     }
 
     let mut pool0 = Pool::new(&config.pool[0].addr);
-    let connect_pool = pool0.connect();
-    let checker = pool0.checker();
-
-    // mining.configure
-    pool0.configure(&config.client);
-    pool0.subscribe(&config.client.user_agent);
-    pool0.authorize(&config.pool[0].user, &config.pool[0].pass);
+    let connect_pool0 = pool0.connect(&config, 0).select2(pool0.checker());
 
     let pool_sender = pool0.sender();
     let pool_diff = pool0.diff.clone();
@@ -49,11 +43,7 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     if config.pool.get(1).is_some() {
         thread::spawn(move || loop {
             let mut pool1 = Pool::new(&config.pool[1].addr);
-            let task = Some(pool1.connect().select2(pool1.checker()));
-
-            pool1.configure(&config.client);
-            pool1.subscribe(&config.client.user_agent);
-            pool1.authorize(&config.pool[1].user, &config.pool[1].pass);
+            let task = Some(pool1.connect(&config, 1).select2(pool1.checker()));
 
             let pool1_data = PoolData::from_pool(&mut pool1, Duration::from_secs(10));
             if let Err(e) = pool1_data_sender.clone().send(pool1_data).wait() {
@@ -173,12 +163,11 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     });
 
     let mut runtime = current_thread::Runtime::new().unwrap();
-    let task = connect_pool
+    let task = connect_pool0
         .select2(get_pool1_data)
         .select2(send_to_fpga)
         .select2(receive_nonce)
         .select2(exit2_receiver.clone())
-        .select2(checker)
         .then(move |_| {
             exit1.notify();
             exit2_receiver
