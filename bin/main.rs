@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use boardconfig::*;
 use futures::sync::mpsc::channel;
-use serde_json::{json, to_string as to_json_string};
+use serde_json::to_string as to_json_string;
 use stratum::{stratum::*, util::*, work::*};
 use tokio::prelude::*;
 use tokio::runtime::current_thread;
@@ -33,19 +33,13 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
         init_board(*id, voltage, param, i2c.clone(), boards.clone()).expect("init board err!");
     }
 
-    let exts = vec!["version-rolling"];
-    let ext_params = json!({
-        "version-rolling.mask": config.client.version_rolling.mask,
-        "version-rolling.min-bit-count": config.client.version_rolling.min_bit_count
-    });
-
     let mut pool0 = Pool::new(&config.pool[0].addr);
     let connect_pool = pool0.connect();
     let checker = pool0.checker();
 
     // mining.configure
-    pool0.configure(exts.clone(), ext_params.clone());
-    pool0.subscribe(config.client.user_agent.clone());
+    pool0.configure(&config.client);
+    pool0.subscribe(&config.client.user_agent);
     pool0.authorize(&config.pool[0].user, &config.pool[0].pass);
 
     let pool_sender = pool0.sender();
@@ -66,14 +60,12 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
 
     let (pool1_data_sender, pool1_data_receiver) = channel(1);
     if config.pool.get(1).is_some() {
-        let config = config.clone();
-
         thread::spawn(move || loop {
             let mut pool1 = Pool::new(&config.pool[1].addr);
             let task = Some(pool1.connect().select2(pool1.checker()));
 
-            pool1.configure(exts.clone(), ext_params.clone());
-            pool1.subscribe(config.client.user_agent.clone());
+            pool1.configure(&config.client);
+            pool1.subscribe(&config.client.user_agent);
             pool1.authorize(&config.pool[1].user, &config.pool[1].pass);
 
             let pool1_data = PoolData {

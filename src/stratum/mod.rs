@@ -8,12 +8,13 @@ use futures::future::{err, ok};
 use futures::stream::Stream;
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use futures::{Async::*, Future, Poll};
+use serde_json::json;
 use tokio::codec::{Decoder, LinesCodec};
 use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::reactor::Handle;
 
-use super::util::{Notify, SinkHook};
+use super::util::{Client, Notify, SinkHook};
 use super::work::*;
 
 pub use self::message::*;
@@ -149,9 +150,9 @@ impl Pool {
             .and_then(|_| Ok(()))
     }
 
-    pub fn subscribe(&mut self, ua: Option<String>) {
+    pub fn subscribe(&mut self, ua: &Option<String>) {
         let params = match ua {
-            Some(ua) => Params::String([ua; 1]),
+            Some(ua) => Params::String([ua.to_string(); 1]),
             None => Params::None([]),
         };
 
@@ -173,7 +174,12 @@ impl Pool {
         let _ = self.send(&msg).wait();
     }
 
-    pub fn configure(&mut self, exts: Vec<&'static str>, ext_params: serde_json::Value) {
+    pub fn configure(&mut self, client: &Client) {
+        let exts = vec!["version-rolling"];
+        let ext_params = json!({
+            "version-rolling.mask": client.version_rolling.mask,
+            "version-rolling.min-bit-count": client.version_rolling.min_bit_count
+        });
         let msg = Action {
             id: Some(0),
             method: "mining.configure",
