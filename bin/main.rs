@@ -12,6 +12,7 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 
 use boardconfig::*;
+use futures::sync::mpsc::channel;
 use serde_json::{json, to_string as to_json_string};
 use stratum::{stratum::*, util::*, work::*};
 use tokio::prelude::*;
@@ -43,8 +44,8 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     let checker = pool0.checker();
 
     // mining.configure
-    pool0.configure(exts, ext_params);
-    pool0.subscribe(config.client.user_agent);
+    pool0.configure(exts.clone(), ext_params.clone());
+    pool0.subscribe(config.client.user_agent.clone());
     pool0.authorize(&config.pool[0].user, &config.pool[0].pass);
 
     let pool_sender = pool0.sender();
@@ -52,16 +53,55 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
 
     let submitted_nonce = pool0.submitted_nonce.clone();
 
-    let mut subwork2_stream = Subwork2Stream::default();
+    let subwork2_stream = Subwork2Stream::default();
     let pool0_data = PoolData {
-        duration: Duration::from_secs(30),
-        works: WorkStream(pool0.work_channel.1),
+        duration: Duration::from_secs(20),
+        works: pool0.workstream(),
         xnonce: pool0.xnonce.clone(),
         vermask: pool0.vermask.clone(),
         notify: pool0.work_notify.clone(),
         maker: None,
     };
-    subwork2_stream.pools.push(pool0_data);
+    subwork2_stream.pools.lock().unwrap().push(pool0_data);
+
+    let (pool1_data_sender, pool1_data_receiver) = channel(1);
+    if config.pool.get(1).is_some() {
+        let config = config.clone();
+
+        thread::spawn(move || loop {
+            let mut pool1 = Pool::new(&config.pool[1].addr);
+            let task = Some(pool1.connect().select2(pool1.checker()));
+
+            pool1.configure(exts.clone(), ext_params.clone());
+            pool1.subscribe(config.client.user_agent.clone());
+            pool1.authorize(&config.pool[1].user, &config.pool[1].pass);
+
+            let pool1_data = PoolData {
+                duration: Duration::from_secs(20),
+                works: pool1.workstream(),
+                xnonce: pool1.xnonce.clone(),
+                vermask: pool1.vermask.clone(),
+                notify: pool1.work_notify.clone(),
+                maker: None,
+            };
+            if let Err(e) = pool1_data_sender.clone().send(pool1_data).wait() {
+                error!("send pool data err: {:?}!", e)
+            };
+
+            let mut runtime = current_thread::Runtime::new().unwrap();
+            let _ = runtime.block_on(task);
+        });
+    }
+    let pools_data = subwork2_stream.pools.clone();
+    let get_pool1_data = pool1_data_receiver.for_each(|data| {
+        let mut pools_data = pools_data.lock().unwrap();
+        if pools_data.len() == 1 {
+            pools_data.push(data);
+        } else {
+            pools_data[1] = data;
+        }
+        Ok(())
+    });
 
     let fpga_writer = Arc::new(Mutex::new(fpga::writer()));
 
@@ -162,6 +202,7 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
 
     let mut runtime = current_thread::Runtime::new().unwrap();
     let task = connect_pool
+        .select2(get_pool1_data)
         .select2(send_to_fpga)
         .select2(receive_nonce)
         .select2(exit2_receiver.clone())

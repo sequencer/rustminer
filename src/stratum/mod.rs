@@ -55,7 +55,7 @@ pub struct Pool {
     pub authorized: (Option<String>, Arc<AtomicBool>),
     pub xnonce: Arc<Mutex<(Bytes, usize)>>,
     pub submitted_nonce: Arc<Mutex<[Option<u32>; 8]>>,
-    pub work_channel: (Sender<Work>, Receiver<Work>),
+    pub work_channel: (Sender<Work>, Option<Receiver<Work>>),
     pub work_notify: Notify,
     pub vermask: Arc<Mutex<Option<u32>>>,
     pub diff: Arc<Mutex<f64>>,
@@ -64,6 +64,7 @@ pub struct Pool {
 
 impl Pool {
     pub fn new(addr: &str) -> Self {
+        let work_channel = channel(4);
         Self {
             addr: String::from(addr),
             reader: None,
@@ -72,7 +73,7 @@ impl Pool {
             authorized: (None, Arc::new(AtomicBool::new(false))),
             xnonce: Arc::new(Mutex::new((Bytes::new(), 0))),
             submitted_nonce: Arc::new(Mutex::new([None; 8])),
-            work_channel: channel(4),
+            work_channel: (work_channel.0, Some(work_channel.1)),
             work_notify: Notify::default(),
             vermask: Arc::new(Mutex::new(None)),
             diff: Arc::new(Mutex::new(1.0)),
@@ -128,6 +129,10 @@ impl Pool {
 
             reader.select2(writer).map(drop).map_err(drop)
         })
+    }
+
+    pub fn workstream(&mut self) -> WorkStream {
+        WorkStream(self.work_channel.1.take().unwrap())
     }
 
     pub fn sender(&mut self) -> Sender<String> {

@@ -34,7 +34,7 @@ pub struct PoolData {
 }
 
 pub struct Subwork2Stream {
-    pub pools: Vec<PoolData>,
+    pub pools: Arc<Mutex<Vec<PoolData>>>,
     pub current: usize,
     pub timeout: Instant,
 }
@@ -42,7 +42,7 @@ pub struct Subwork2Stream {
 impl Default for Subwork2Stream {
     fn default() -> Self {
         Self {
-            pools: Vec::new(),
+            pools: Arc::new(Mutex::new(Vec::new())),
             current: 0,
             timeout: Instant::now(),
         }
@@ -51,11 +51,13 @@ impl Default for Subwork2Stream {
 
 impl Subwork2Stream {
     fn current(&mut self) -> usize {
-        if self.pools.len() == 2 {
+        let pool = self.pools.lock().unwrap();
+
+        if pool.len() == 2 {
             let now = Instant::now();
             if now > self.timeout {
                 self.current ^= 1;
-                self.timeout = now + self.pools[self.current].duration;
+                self.timeout = now + pool[self.current].duration;
                 debug!("switch to pool {}", self.current);
             }
             self.current
@@ -70,26 +72,27 @@ impl Stream for Subwork2Stream {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let cur = self.current();
+        let current = self.current();
+        let pool = &mut self.pools.lock().unwrap()[current];
 
-        if let Ok(Async::Ready(Some(work))) = self.pools[cur].works.poll() {
-            self.pools[cur].notify.notified();
+        if let Ok(Async::Ready(Some(work))) = pool.works.poll() {
+            pool.notify.notified();
             let subwork2maker = Subwork2Maker::new(
                 work,
-                &self.pools[cur].xnonce.lock().unwrap(),
-                self.pools[cur].vermask.lock().unwrap().unwrap(),
+                &pool.xnonce.lock().unwrap(),
+                pool.vermask.lock().unwrap().unwrap(),
             );
-            self.pools[cur].maker = Some(subwork2maker);
+            pool.maker = Some(subwork2maker);
         }
 
-        let subwork2 = match self.pools[cur].maker {
+        let subwork2 = match pool.maker {
             Some(ref mut maker) => maker.next(),
             None => return Ok(Async::NotReady),
         };
 
         match subwork2 {
             Some(subwork2) => {
-                let notify = self.pools[cur].notify.clone();
+                let notify = pool.notify.clone();
                 let now = Instant::now();
                 let timeout = if self.timeout > now {
                     min(Duration::from_secs(10), self.timeout - now)

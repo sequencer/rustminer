@@ -1,34 +1,34 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Config {
     pub pool: Vec<Pool>,
     pub board: Board,
     pub client: Client,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Pool {
     pub addr: String,
     pub user: String,
     pub pass: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct Client {
     pub user_agent: Option<String>,
     pub version_rolling: VersionRolling,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct VersionRolling {
     pub mask: String,
     pub min_bit_count: Option<u8>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Board {
     pub enabled: Vec<u16>,
@@ -41,6 +41,12 @@ pub struct Board {
     pub _5: Option<BoardSetting>,
     pub _6: Option<BoardSetting>,
     pub _7: Option<BoardSetting>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct BoardSetting {
+    pub voltage: Option<f32>,
+    pub param: Option<u32>,
 }
 
 impl Board {
@@ -71,10 +77,4 @@ impl Board {
         }
         setting
     }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct BoardSetting {
-    pub voltage: Option<f32>,
-    pub param: Option<u32>,
 }
