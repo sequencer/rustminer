@@ -39,6 +39,19 @@ pub struct Subwork2Stream {
     pub timeout: Instant,
 }
 
+impl PoolData {
+    pub fn from_pool(pool: &mut Pool, duration: Duration) -> Self {
+        Self {
+            duration,
+            works: pool.workstream(),
+            xnonce: pool.xnonce.clone(),
+            vermask: pool.vermask.clone(),
+            notify: pool.work_notify.clone(),
+            maker: None,
+        }
+    }
+}
+
 impl Default for Subwork2Stream {
     fn default() -> Self {
         Self {

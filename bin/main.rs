@@ -48,14 +48,7 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     let submitted_nonce = pool0.submitted_nonce.clone();
 
     let subwork2_stream = Subwork2Stream::default();
-    let pool0_data = PoolData {
-        duration: Duration::from_secs(20),
-        works: pool0.workstream(),
-        xnonce: pool0.xnonce.clone(),
-        vermask: pool0.vermask.clone(),
-        notify: pool0.work_notify.clone(),
-        maker: None,
-    };
+    let pool0_data = PoolData::from_pool(&mut pool0, Duration::from_secs(20));
     subwork2_stream.pools.lock().unwrap().push(pool0_data);
 
     let (pool1_data_sender, pool1_data_receiver) = channel(1);
@@ -68,14 +61,7 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
             pool1.subscribe(&config.client.user_agent);
             pool1.authorize(&config.pool[1].user, &config.pool[1].pass);
 
-            let pool1_data = PoolData {
-                duration: Duration::from_secs(20),
-                works: pool1.workstream(),
-                xnonce: pool1.xnonce.clone(),
-                vermask: pool1.vermask.clone(),
-                notify: pool1.work_notify.clone(),
-                maker: None,
-            };
+            let pool1_data = PoolData::from_pool(&mut pool1, Duration::from_secs(10));
             if let Err(e) = pool1_data_sender.clone().send(pool1_data).wait() {
                 error!("send pool data err: {:?}!", e)
             };
