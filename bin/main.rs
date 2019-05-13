@@ -30,23 +30,31 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     let mut pool0 = Pool::new(&config.pool[0].addr);
     let connect_pool0 = pool0.connect(&config, 0).select2(pool0.checker());
 
-    let pool_sender = pool0.sender();
-    let pool_diff = pool0.diff.clone();
-
-    let submitted_nonce = pool0.submitted_nonce.clone();
+    let pool_sender = Arc::new(Mutex::new(vec![pool0.sender()]));
+    let pool_diff = Arc::new(Mutex::new(vec![pool0.diff.clone()]));
+    let submitted_nonce = Arc::new(Mutex::new(vec![pool0.submitted_nonce.clone()]));
 
     let subwork2_stream = Subwork2Stream::default();
     let pool0_data = PoolData::from_pool(&mut pool0, Duration::from_secs(20));
     subwork2_stream.pools.lock().unwrap().push(pool0_data);
 
+    let mut user = vec![config.pool[0].user.clone()];
     let (pool1_data_sender, pool1_data_receiver) = channel(1);
     if config.pool.get(1).is_some() {
+        user.push(config.pool[1].user.clone());
         thread::spawn(move || loop {
             let mut pool1 = Pool::new(&config.pool[1].addr);
             let task = Some(pool1.connect(&config, 1).select2(pool1.checker()));
 
             let pool1_data = PoolData::from_pool(&mut pool1, Duration::from_secs(10));
-            if let Err(e) = pool1_data_sender.clone().send(pool1_data).wait() {
+            let pool1_sender = pool1.sender();
+            let pool1_diff = pool1.diff.clone();
+            let pool1_submitted_nonce = pool1.submitted_nonce.clone();
+            if let Err(e) = pool1_data_sender
+                .clone()
+                .send((pool1_data, pool1_sender, pool1_diff, pool1_submitted_nonce))
+                .wait()
+            {
                 error!("send pool data err: {:?}!", e)
             };
 
@@ -55,12 +63,21 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
         });
     }
     let pools_data = subwork2_stream.pools.clone();
-    let get_pool1_data = pool1_data_receiver.for_each(|data| {
+    let pool_sender_clone = pool_sender.clone();
+    let pool_diff_clone = pool_diff.clone();
+    let submitted_nonce_clone = submitted_nonce.clone();
+    let get_pool1_data = pool1_data_receiver.for_each(|(data, sender, diff, nonce)| {
         let mut pools_data = pools_data.lock().unwrap();
         if pools_data.len() == 1 {
             pools_data.push(data);
+            pool_sender_clone.lock().unwrap().push(sender);
+            pool_diff_clone.lock().unwrap().push(diff);
+            submitted_nonce_clone.lock().unwrap().push(nonce);
         } else {
             pools_data[1] = data;
+            pool_sender_clone.lock().unwrap()[1] = sender;
+            pool_diff_clone.lock().unwrap()[1] = diff;
+            submitted_nonce_clone.lock().unwrap()[1] = nonce;
         }
         Ok(())
     });
@@ -96,8 +113,7 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
     });
 
     let mut offset = 0u32;
-    let mut nonce_id = 0;
-    let user = pool0.authorized.0.expect("not authorized!");
+    let mut nonce_id = [0; 2];
     let receive_nonce = nonce_receiver.for_each(move |received| {
         let fpga_writer = fpga_writer.clone();
         let nonce = u32::from_le_bytes(unsafe { *(received[0..4].as_ptr() as *const [u8; 4]) });
@@ -112,6 +128,8 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
         }
 
         for sw2 in subworks {
+            let pool = sw2.pool;
+
             for i in (1..=16).map(|x| {
                 (if x & 1 == 0 {
                     offset.wrapping_add(x >> 1)
@@ -125,28 +143,34 @@ fn main_loop(boards: Arc<Mutex<Vec<u16>>>, i2c: Arc<Mutex<I2c>>) {
                     offset = i;
                     let diff = Subwork2::target_diff(&target);
                     debug!("received: {}, difficulty: {:0<18}", received.to_hex(), diff);
-                    if diff >= *pool_diff.lock().unwrap() {
-                        let params = sw2.into_params(&user, nonce, version_bits);
+                    if diff >= *pool_diff.lock().unwrap()[pool].lock().unwrap() {
+                        let params = sw2.into_params(&user[pool], nonce, version_bits);
                         let msg = Action {
-                            id: Some(nonce_id),
+                            id: Some(nonce_id[pool]),
                             method: "mining.submit",
                             params,
                         };
 
                         let data = to_json_string(&msg).unwrap();
-                        tokio::spawn(pool_sender.clone().send(data).then(|_| Ok(())));
+                        tokio::spawn(
+                            pool_sender.lock().unwrap()[pool]
+                                .clone()
+                                .send(data)
+                                .then(|_| Ok(())),
+                        );
                         info!(
                             "=> submit nonce: 0x{:08x} (difficulty: {:0<18})",
                             nonce, diff
                         );
 
+                        let submitted_nonce = &submitted_nonce.lock().unwrap()[pool];
                         let submitted_nonce =
-                            &mut submitted_nonce.lock().unwrap()[(nonce_id & 0b111) as usize];
+                            &mut submitted_nonce.lock().unwrap()[(nonce_id[pool] & 0b111) as usize];
                         if let Some(nonce_old) = submitted_nonce {
                             warn!("submitted nonce 0x{:08x} lost!", nonce_old);
                         }
                         *submitted_nonce = Some(nonce);
-                        nonce_id = nonce_id.wrapping_add(1);
+                        nonce_id[pool] = nonce_id[pool].wrapping_add(1);
                     };
                     return Ok(());
                 }

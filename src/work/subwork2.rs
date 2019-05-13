@@ -14,6 +14,7 @@ use super::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct Subwork2 {
+    pub pool: usize,
     pub workid: String,
     pub prevhash: Bytes,
     pub merkle_root: Bytes,
@@ -104,7 +105,7 @@ impl Stream for Subwork2Stream {
         };
 
         match subwork2 {
-            Some(subwork2) => {
+            Some(mut subwork2) => {
                 let notify = pool.notify.clone();
                 let now = Instant::now();
                 let timeout = if self.timeout > now {
@@ -112,6 +113,7 @@ impl Stream for Subwork2Stream {
                 } else {
                     Duration::from_secs(10)
                 };
+                subwork2.pool = current;
                 Ok(Async::Ready(Some((subwork2, notify, timeout))))
             }
             None => Ok(Async::NotReady),

@@ -72,6 +72,7 @@ impl Work {
 
     pub fn subwork2(&self, xnonce: (&Bytes, Bytes), vermask: u32) -> Subwork2 {
         Subwork2 {
+            pool: 0,
             workid: self.id.clone(),
             prevhash: self.prevhash.clone(),
             merkle_root: self.merkle_root(&xnonce),
