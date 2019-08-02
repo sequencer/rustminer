@@ -56,7 +56,7 @@ pub struct SubworkMaker {
     xnonce1: Bytes,
     xnonce2_size: usize,
     counter: BigUint,
-    serial_cloned: Box<SerialPort>,
+    serial_cloned: Box<dyn SerialPort>,
     work_notify: Notify,
 }
 
@@ -65,7 +65,7 @@ impl SubworkMaker {
         work: Work,
         xnonce: &(Bytes, usize),
         work_notify: Notify,
-        serial_cloned: Box<SerialPort>,
+        serial_cloned: Box<dyn SerialPort>,
     ) -> Self {
         work_notify.notified();
         Self {
