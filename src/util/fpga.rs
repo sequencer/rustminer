@@ -91,16 +91,9 @@ pub fn crc5_false(data: &[u8], offset: usize) -> u8 {
     if offset == 0 {
         CRC5.update_crc(crc, data)
     } else {
+        assert!(data.len() > 0);
         CRC5.update_crc(crc, &data[..data.len() - 1]);
-        *crc ^= data.last().unwrap() & (0xff << offset);
-        for _ in offset..8 {
-            if crc.leading_zeros() == 0 {
-                *crc = *crc << 1 ^ 0x28;
-            } else {
-                *crc <<= 1;
-            }
-        }
-        CRC5.finish_crc(crc)
+        CRC5.update_bits_crc(crc, *data.last().unwrap(), offset)
     }
 }
 
